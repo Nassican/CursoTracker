@@ -4,13 +4,71 @@ import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
     QLabel, QStackedWidget, QScrollArea, QGridLayout,
-    QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider)
-from PySide6.QtCore import Qt, QSize, QUrl, QDir
+    QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider, QCheckBox)
+from PySide6.QtCore import Qt, QSize, QUrl, QDir, Signal
 from PySide6.QtGui import QIcon, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
+
+
+class VideoItemWidget(QWidget):
+    checkbox_changed = Signal(bool)
+
+    def __init__(self, nombre, progreso, visto, marcar_callback):
+        super().__init__()
+
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        vertical_layout = QVBoxLayout(self)
+        vertical_layout.setContentsMargins(0, 10, 10, 10)
+
+        self.checkbox = QCheckBox()
+        self.checkbox.setChecked(visto)
+        self.checkbox.stateChanged.connect(self.on_checkbox_changed)
+        self.marcar_callback = marcar_callback
+        layout.addWidget(self.checkbox)
+
+        self.nombre_label = QLabel(nombre)
+        self.nombre_label.setWordWrap(True)
+        layout.addWidget(self.nombre_label)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(int(progreso * 100))
+        self.progress_bar.setTextVisible(False)
+
+        vertical_layout.addLayout(layout)
+        vertical_layout.addWidget(self.progress_bar)
+
+    def on_checkbox_changed(self, state):
+        self.marcar_callback(state == Qt.Checked)
+        self.checkbox_changed.emit(state == Qt.Checked)
+
+
+class FileItemWidget(QWidget):
+    checkbox_changed = Signal(bool)
+
+    def __init__(self, nombre, visto, marcar_callback):
+        super().__init__()
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 10, 10, 10)
+
+        self.checkbox = QCheckBox()
+        self.checkbox.setChecked(visto)
+        self.checkbox.stateChanged.connect(self.on_checkbox_changed)
+        self.marcar_callback = marcar_callback
+        layout.addWidget(self.checkbox)
+
+        self.nombre_label = QLabel(nombre)
+        self.nombre_label.setWordWrap(True)
+        layout.addWidget(self.nombre_label)
+
+    def on_checkbox_changed(self, state):
+        self.marcar_callback(state == Qt.Checked)
+        self.checkbox_changed.emit(state == Qt.Checked)
 
 
 class CustomWebEnginePage(QWebEnginePage):
@@ -496,16 +554,30 @@ class CursoTracker(QMainWindow):
         for seccion, archivos in self.cursos_data[curso_name]['archivos'].items():
             seccion_item = QTreeWidgetItem(self.tree_widget, [seccion])
             for archivo in archivos:
-                icon = QIcon("path_to_html_icon.png") if archivo['tipo'] == 'html' else QIcon(
-                    "path_to_video_icon.png")
-                archivo_item = QTreeWidgetItem(
-                    seccion_item, [archivo['nombre']])
-                archivo_item.setIcon(0, icon)
-                archivo_item.setData(0, Qt.UserRole, os.path.join(
-                    self.cursos_data[curso_name]['ruta'], seccion, archivo['nombre']))
+                archivo_item = QTreeWidgetItem(seccion_item)
+                if archivo['tipo'] == 'video':
+                    widget = VideoItemWidget(
+                        archivo['nombre'],
+                        self.cursos_data[curso_name]['progress'].get(
+                            archivo['nombre'], {}).get('progreso', 0),
+                        archivo['visto'],
+                        lambda checked, a=archivo: self.marcar_archivo(
+                            a, checked)
+                    )
+                else:
+                    widget = FileItemWidget(
+                        archivo['nombre'],
+                        archivo['visto'],
+                        lambda checked, a=archivo: self.marcar_archivo(
+                            a, checked)
+                    )
+                self.tree_widget.setItemWidget(archivo_item, 0, widget)
 
         self.stacked_widget.setCurrentWidget(self.curso_detail_page)
-        self.btn_volver_inicio.show()  # Asegurarse de que el botón esté visible
+        self.btn_volver_inicio.show()
+
+    def marcar_archivo(self, archivo, checked):
+        pass
 
     def load_progress_data(self):
         try:
@@ -529,22 +601,36 @@ class CursoTracker(QMainWindow):
         with open("progress_data.json", "w", encoding="utf-8") as f:
             json.dump(self.progress_data, f, ensure_ascii=False, indent=2)
 
-    def mostrar_archivo(self, item):
+    def mostrar_archivo(self, item, column):
         if self.curso_actual is None:
             print("Error: No hay curso seleccionado")
             return
-        ruta_archivo = item.data(0, Qt.UserRole)
-        if ruta_archivo:
+
+        # Obtener el widget del item
+        widget = self.tree_widget.itemWidget(item, 0)
+        if widget is None:
+            return
+
+        # Obtener el nombre del archivo
+        if isinstance(widget, VideoItemWidget) or isinstance(widget, FileItemWidget):
+            nombre_archivo = widget.nombre_label.text()
+        else:
+            return
+
+        # Construir la ruta completa del archivo
+        ruta_curso = self.cursos_data[self.curso_actual]['ruta']
+        seccion = item.parent().text(0) if item.parent() else 'Principal'
+        ruta_archivo = os.path.join(ruta_curso, seccion, nombre_archivo)
+
+        if os.path.exists(ruta_archivo):
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
                 self.video_widget.set_source(
                     QUrl.fromLocalFile(ruta_archivo), self.curso_actual)
                 self.content_area.setCurrentWidget(self.video_widget)
-                # self.video_widget.media_player.play()
             elif ruta_archivo.lower().endswith('.html'):
                 url = QUrl(
                     f"file:///{QDir.fromNativeSeparators(ruta_archivo)}")
                 print(f"Cargando archivo: {url}")
-                # self.web_view.load(url)
                 self.web_view.setUrl(url)
                 self.content_area.setCurrentWidget(self.web_view)
                 self.web_view.setSizePolicy(
@@ -554,6 +640,8 @@ class CursoTracker(QMainWindow):
                 self.text_browser.setText(
                     f"Archivo no soportado: {ruta_archivo}")
                 self.content_area.setCurrentWidget(self.text_browser)
+        else:
+            print(f"El archivo no existe: {ruta_archivo}")
 
     def agregar_carpeta(self):
         carpeta = QFileDialog.getExistingDirectory(self, "Seleccionar Carpeta")
