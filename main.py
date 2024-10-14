@@ -262,6 +262,8 @@ class CustomVideoWidget(QWidget):
     def on_media_status_changed(self, status):
         if status == QMediaPlayer.EndOfMedia and not self.end_of_media_processed:
             self.end_of_media_processed = True  # Marcar como procesado
+            self.media_player.mediaStatusChanged.disconnect(
+                self.on_media_status_changed)
             self.last_position = self.media_player.duration()
             self.save_current_progress()
             self.video_completed = True
@@ -298,6 +300,7 @@ class CursoTracker(QMainWindow):
         self.setup_ui()
         self.cargar_cursos()
         self.load_progress_data()
+        self.btn_volver_inicio.hide()
 
     def setup_ui(self):
         # Página principal de cursos
@@ -326,10 +329,25 @@ class CursoTracker(QMainWindow):
         self.curso_detail_page = QWidget()
         curso_detail_layout = QHBoxLayout(self.curso_detail_page)
 
+        # Página de detalle del curso
+        self.curso_detail_page = QWidget()
+        curso_detail_layout = QHBoxLayout(self.curso_detail_page)
+
+        # Crear un widget para contener el árbol y el botón
+        tree_container = QWidget()
+        tree_layout = QVBoxLayout(tree_container)
+
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderHidden(True)
         self.tree_widget.itemClicked.connect(self.mostrar_archivo)
-        curso_detail_layout.addWidget(self.tree_widget, 1)
+        tree_layout.addWidget(self.tree_widget)
+
+        # Crear el botón "Volver al Inicio"
+        self.btn_volver_inicio = QPushButton("Volver al Inicio")
+        self.btn_volver_inicio.clicked.connect(self.volver_al_inicio)
+        tree_layout.addWidget(self.btn_volver_inicio)
+
+        curso_detail_layout.addWidget(tree_container, 1)
 
         self.content_area = QStackedWidget()
 
@@ -347,6 +365,13 @@ class CursoTracker(QMainWindow):
         curso_detail_layout.addWidget(self.content_area, 2)
 
         self.stacked_widget.addWidget(self.curso_detail_page)
+
+    def volver_al_inicio(self):
+        self.stacked_widget.setCurrentWidget(self.cursos_page)
+        self.curso_actual = None
+        self.tree_widget.clear()
+        self.content_area.setCurrentWidget(self.text_browser)
+        self.text_browser.setText("Selecciona un curso para ver su contenido.")
 
     def cargar_cursos(self):
         try:
@@ -480,6 +505,7 @@ class CursoTracker(QMainWindow):
                     self.cursos_data[curso_name]['ruta'], seccion, archivo['nombre']))
 
         self.stacked_widget.setCurrentWidget(self.curso_detail_page)
+        self.btn_volver_inicio.show()  # Asegurarse de que el botón esté visible
 
     def load_progress_data(self):
         try:
