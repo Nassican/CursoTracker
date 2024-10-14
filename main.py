@@ -1,15 +1,61 @@
 import os
 import json
 import re
-from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
-                               QHBoxLayout, QPushButton, QListWidget, QFileDialog,
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QVBoxLayout,QHBoxLayout, QPushButton, QFileDialog,
                                QLabel, QStackedWidget, QScrollArea, QGridLayout,
-                               QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy)
-from PySide6.QtCore import Qt, QSize, QUrl
-from PySide6.QtGui import QIcon
+                               QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox)
+from PySide6.QtCore import Qt, QSize, QUrl, QDir
+from PySide6.QtGui import QIcon, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
+
+class CustomWebEnginePage(QWebEnginePage):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.linkHovered.connect(self.onLinkHovered)
+
+    def acceptNavigationRequest(self, url, _type, isMainFrame):
+        print(f"acceptNavigationRequest: url={url}, type={_type}, isMainFrame={isMainFrame}")
+        if url.scheme() == "file":
+            return True
+        if _type == QWebEnginePage.NavigationTypeLinkClicked:
+            QDesktopServices.openUrl(url)
+            return False
+        return True
+
+    def onLinkHovered(self, url):
+        pass
+        #print(f"Link hovered: {url}")
+
+    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
+        #print(f"JavaScript Console: {message}")
+        if message.startswith("Link clicked:"):
+            url = QUrl(message.split(": ")[1])
+            QDesktopServices.openUrl(url)
+
+class CustomWebEngineView(QWebEngineView):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setPage(CustomWebEnginePage(self))
+        self.page().loadFinished.connect(self.onLoadFinished)
+
+    def onLoadFinished(self, ok):
+        if ok:
+            self.page().runJavaScript("""
+                document.addEventListener('click', function(e) {
+                    var target = e.target;
+                    while(target) {
+                        if(target.tagName === 'A') {
+                            console.log('Link clicked: ' + target.href);
+                            break;
+                        }
+                        target = target.parentElement;
+                    }
+                });
+            """)
 
 class CursoCard(QWidget):
     def __init__(self, curso):
@@ -100,7 +146,7 @@ class CursoTracker(QMainWindow):
         self.content_area.addWidget(self.video_widget)
 
         # Área de HTML
-        self.web_view = QWebEngineView()
+        self.web_view = CustomWebEngineView()
         self.content_area.addWidget(self.web_view)
 
         # Área de texto (para mostrar mensajes)
@@ -210,12 +256,13 @@ class CursoTracker(QMainWindow):
                 self.audio_output.setVolume(50)  # Ajusta el volumen al 50%
                 self.media_player.play()
             elif ruta_archivo.lower().endswith('.html'):
-                self.web_view.load(QUrl.fromLocalFile(ruta_archivo))
+                url = QUrl(f"file:///{QDir.fromNativeSeparators(ruta_archivo)}")
+                print(f"Cargando archivo: {url}")
+                #self.web_view.load(url)
+                self.web_view.setUrl(url)
                 self.content_area.setCurrentWidget(self.web_view)
-                print(f"Cargando archivo: {ruta_archivo}")
-                # Asegurarse de que el WebView ocupe todo el espacio disponible
                 self.web_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-                self.web_view.setZoomFactor(1.0)  # Ajusta el zoom si es necesario
+                self.web_view.setZoomFactor(1.0)
             else:
                 self.text_browser.setText(f"Archivo no soportado: {ruta_archivo}")
                 self.content_area.setCurrentWidget(self.text_browser)
