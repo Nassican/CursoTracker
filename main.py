@@ -105,6 +105,8 @@ class CustomVideoWidget(QWidget):
         self.current_video_path = None
         self.curso_name = None
         self.last_position = 0  # Añadimos esta variable para almacenar la última posición
+        self.end_of_media_processed = False
+        self.video_completed = False
         self.media_player = QMediaPlayer()
         self.media_player.mediaStatusChanged.connect(
             self.on_media_status_changed)
@@ -216,6 +218,7 @@ class CustomVideoWidget(QWidget):
         self.last_position = 0
         self.position_slider.setValue(0)
         self.video_completed = False
+        self.end_of_media_processed = False
 
         # Establecer la nueva fuente
         self.media_player.setSource(url)
@@ -257,7 +260,8 @@ class CustomVideoWidget(QWidget):
             self.save_current_progress()
 
     def on_media_status_changed(self, status):
-        if status == QMediaPlayer.EndOfMedia:
+        if status == QMediaPlayer.EndOfMedia and not self.end_of_media_processed:
+            self.end_of_media_processed = True  # Marcar como procesado
             self.last_position = self.media_player.duration()
             self.save_current_progress()
             self.video_completed = True
