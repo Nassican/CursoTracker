@@ -14,9 +14,9 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 
 
 class VideoItemWidget(QWidget):
-    checkbox_changed = Signal(bool)
+    checkbox_changed = Signal(bool, object)
 
-    def __init__(self, nombre, progreso, visto, marcar_callback):
+    def __init__(self, archivo, progreso, visto, marcar_callback):
         super().__init__()
 
         layout = QHBoxLayout()
@@ -27,11 +27,13 @@ class VideoItemWidget(QWidget):
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(visto)
-        self.checkbox.stateChanged.connect(self.on_checkbox_changed)
+        # Cambiamos stateChanged por clicked
+        self.checkbox.clicked.connect(self.on_checkbox_clicked)
         self.marcar_callback = marcar_callback
+        self.archivo = archivo
         layout.addWidget(self.checkbox)
 
-        self.nombre_label = QLabel(nombre)
+        self.nombre_label = QLabel(archivo['nombre'])
         self.nombre_label.setWordWrap(True)
         layout.addWidget(self.nombre_label)
 
@@ -43,32 +45,35 @@ class VideoItemWidget(QWidget):
         vertical_layout.addLayout(layout)
         vertical_layout.addWidget(self.progress_bar)
 
-    def on_checkbox_changed(self, state):
-        self.marcar_callback(state == Qt.Checked)
-        self.checkbox_changed.emit(state == Qt.Checked)
+    def on_checkbox_clicked(self):
+        is_checked = self.checkbox.isChecked()
+        self.marcar_callback(self.archivo, is_checked)
+        self.checkbox_changed.emit(is_checked, self.archivo)
 
 
 class FileItemWidget(QWidget):
-    checkbox_changed = Signal(bool)
+    checkbox_changed = Signal(bool, object)
 
-    def __init__(self, nombre, visto, marcar_callback):
+    def __init__(self, archivo, visto, marcar_callback):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 10, 10, 10)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(visto)
-        self.checkbox.stateChanged.connect(self.on_checkbox_changed)
+        self.checkbox.clicked.connect(self.on_checkbox_clicked)
         self.marcar_callback = marcar_callback
+        self.archivo = archivo
         layout.addWidget(self.checkbox)
 
-        self.nombre_label = QLabel(nombre)
+        self.nombre_label = QLabel(archivo['nombre'])
         self.nombre_label.setWordWrap(True)
         layout.addWidget(self.nombre_label)
 
-    def on_checkbox_changed(self, state):
-        self.marcar_callback(state == Qt.Checked)
-        self.checkbox_changed.emit(state == Qt.Checked)
+    def on_checkbox_clicked(self):
+        is_checked = self.checkbox.isChecked()
+        self.marcar_callback(self.archivo, is_checked)
+        self.checkbox_changed.emit(is_checked, self.archivo)
 
 
 class CustomWebEnginePage(QWebEnginePage):
@@ -557,19 +562,17 @@ class CursoTracker(QMainWindow):
                 archivo_item = QTreeWidgetItem(seccion_item)
                 if archivo['tipo'] == 'video':
                     widget = VideoItemWidget(
-                        archivo['nombre'],
+                        archivo,
                         self.cursos_data[curso_name]['progress'].get(
                             archivo['nombre'], {}).get('progreso', 0),
                         archivo['visto'],
-                        lambda checked, a=archivo: self.marcar_archivo(
-                            a, checked)
+                        self.marcar_archivo
                     )
                 else:
                     widget = FileItemWidget(
-                        archivo['nombre'],
+                        archivo,
                         archivo['visto'],
-                        lambda checked, a=archivo: self.marcar_archivo(
-                            a, checked)
+                        self.marcar_archivo
                     )
                 self.tree_widget.setItemWidget(archivo_item, 0, widget)
 
@@ -577,7 +580,15 @@ class CursoTracker(QMainWindow):
         self.btn_volver_inicio.show()
 
     def marcar_archivo(self, archivo, checked):
-        pass
+        if archivo['visto'] != checked:
+            archivo['visto'] = checked
+            if checked:
+                self.cursos_data[self.curso_actual]['archivosVistos'] += 1
+            else:
+                self.cursos_data[self.curso_actual]['archivosVistos'] -= 1
+            self.actualizar_progreso_curso(self.curso_actual)
+            self.guardar_cursos_data()
+        print(f"Archivo: {archivo['nombre']}, Visto: {checked}")
 
     def load_progress_data(self):
         try:
