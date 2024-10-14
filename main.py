@@ -76,21 +76,26 @@ class CursoCard(QWidget):
         name_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(name_label)
 
-        progress_bar = QProgressBar()
-        progress_bar.setRange(0, curso['totalArchivos'])
-        progress_bar.setValue(curso['archivosVistos'])
-        layout.addWidget(progress_bar)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, self.curso['totalArchivos'])
+        self.progress_bar.setValue(self.curso['archivosVistos'])
+        layout.addWidget(self.progress_bar)
 
-        progress_label = QLabel(
-            f"{curso['archivosVistos']} / {curso['totalArchivos']} progreso vistos")
-        progress_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(progress_label)
+        self.progress_label = QLabel(
+            f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} archivos vistos")
+        self.progress_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.progress_label)
 
         change_icon_btn = QPushButton("Cambiar icono")
         layout.addWidget(change_icon_btn)
 
         self.setFixedSize(200, 250)
         self.setStyleSheet("border-radius: 10px;")
+
+    def actualizar_progreso(self):
+        self.progress_bar.setValue(self.curso['archivosVistos'])
+        self.progress_label.setText(
+            f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} archivos vistos")
 
 
 class CustomVideoWidget(QWidget):
@@ -100,6 +105,9 @@ class CustomVideoWidget(QWidget):
         self.current_video_path = None
         self.curso_name = None
         self.last_position = 0  # Añadimos esta variable para almacenar la última posición
+        self.media_player = QMediaPlayer()
+        self.media_player.mediaStatusChanged.connect(
+            self.on_media_status_changed)
         self.setup_ui()
 
     def setup_ui(self):
@@ -108,7 +116,6 @@ class CustomVideoWidget(QWidget):
         self.video_widget = QVideoWidget()
         layout.addWidget(self.video_widget)
 
-        self.media_player = QMediaPlayer()
         self.audio_output = QAudioOutput()
         self.media_player.setAudioOutput(self.audio_output)
         self.media_player.setVideoOutput(self.video_widget)
@@ -208,6 +215,7 @@ class CustomVideoWidget(QWidget):
         self.curso_name = curso_name
         self.last_position = 0
         self.position_slider.setValue(0)
+        self.video_completed = False
 
         # Establecer la nueva fuente
         self.media_player.setSource(url)
@@ -252,7 +260,15 @@ class CustomVideoWidget(QWidget):
         if status == QMediaPlayer.EndOfMedia:
             self.last_position = self.media_player.duration()
             self.save_current_progress()
-            print("Video terminado, progreso guardado al final")
+            self.video_completed = True
+            print(f"Video completado: {self.current_video_path}")
+            print(f"Curso actual: {self.curso_name}")
+            if self.curso_name and self.current_video_path:
+                self.curso_tracker.marcar_video_como_visto(
+                    self.curso_name, self.current_video_path)
+            else:
+                print("Error: curso_name o current_video_path no están definidos")
+            print("Video terminado, marcado como visto y progreso guardado al final")
 
     def on_state_changed(self, state):
         if state == QMediaPlayer.StoppedState:
@@ -264,6 +280,7 @@ class CursoTracker(QMainWindow):
         super().__init__()
         self.setWindowTitle("Seguimiento de Cursos")
         self.setGeometry(100, 100, 1200, 800)
+        self.curso_actual = None
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -336,6 +353,43 @@ class CursoTracker(QMainWindow):
         except FileNotFoundError:
             self.generar_json_cursos()
 
+    def marcar_video_como_visto(self, curso_name, video_path):
+        print(f"Intentando marcar como visto: {video_path}")
+        print(f"Curso: {curso_name}")
+        if curso_name in self.cursos_data:
+            for seccion, archivos in self.cursos_data[curso_name]['archivos'].items():
+                for archivo in archivos:
+                    ruta_completa = os.path.join(
+                        self.cursos_data[curso_name]['ruta'], seccion, archivo['nombre'])
+                    print(f"Comparando: {ruta_completa} con {video_path}")
+                    if os.path.normpath(ruta_completa) == os.path.normpath(video_path):
+                        if not archivo['visto']:
+                            archivo['visto'] = True
+                            self.cursos_data[curso_name]['archivosVistos'] += 1
+                            self.actualizar_progreso_curso(curso_name)
+                            self.guardar_cursos_data()
+                            print(f"Video marcado como visto: {video_path}")
+                        else:
+                            print("El video ya estaba marcado como visto")
+                        return
+        else:
+            print(f"El curso {curso_name} no se encuentra en los datos")
+        print("No se encontró el video en los datos del curso")
+
+    def actualizar_progreso_curso(self, curso_name):
+        curso = self.cursos_data[curso_name]
+        total_archivos = curso['totalArchivos']
+        archivos_vistos = curso['archivosVistos']
+        progreso = (archivos_vistos / total_archivos) * \
+            100 if total_archivos > 0 else 0
+        print(f"Progreso del curso {curso_name}: {progreso:.2f}%")
+        self.actualizar_grid_cursos()
+
+    def guardar_cursos_data(self):
+        with open("cursos_data.json", "w", encoding="utf-8") as f:
+            json.dump(self.cursos_data, f, ensure_ascii=False, indent=2)
+        print("Datos de cursos guardados en cursos_data.json")
+
     def actualizar_grid_cursos(self):
         for i in reversed(range(self.grid_layout.count())):
             self.grid_layout.itemAt(i).widget().setParent(None)
@@ -407,6 +461,7 @@ class CursoTracker(QMainWindow):
             return (float('inf'), nombre.lower())
 
     def mostrar_detalle_curso(self, curso_name):
+        self.curso_actual = curso_name
         self.tree_widget.clear()
 
         for seccion, archivos in self.cursos_data[curso_name]['archivos'].items():
@@ -445,12 +500,14 @@ class CursoTracker(QMainWindow):
             json.dump(self.progress_data, f, ensure_ascii=False, indent=2)
 
     def mostrar_archivo(self, item):
-        curso_name = self.tree_widget.topLevelItem(0).text(0)
+        if self.curso_actual is None:
+            print("Error: No hay curso seleccionado")
+            return
         ruta_archivo = item.data(0, Qt.UserRole)
         if ruta_archivo:
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
                 self.video_widget.set_source(
-                    QUrl.fromLocalFile(ruta_archivo), curso_name)
+                    QUrl.fromLocalFile(ruta_archivo), self.curso_actual)
                 self.content_area.setCurrentWidget(self.video_widget)
                 # self.video_widget.media_player.play()
             elif ruta_archivo.lower().endswith('.html'):
