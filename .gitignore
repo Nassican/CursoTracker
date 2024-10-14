@@ -1,4 +1,5 @@
 .env/
 cursos_data.json
+progress_data.json
 
 cursos_videos/

@@ -2,9 +2,9 @@ import os
 import json
 import re
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout,QHBoxLayout, QPushButton, QFileDialog,
-                               QLabel, QStackedWidget, QScrollArea, QGridLayout,
-                               QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider)
+    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
+    QLabel, QStackedWidget, QScrollArea, QGridLayout,
+    QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider)
 from PySide6.QtCore import Qt, QSize, QUrl, QDir
 from PySide6.QtGui import QIcon, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -12,13 +12,15 @@ from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
 
+
 class CustomWebEnginePage(QWebEnginePage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.linkHovered.connect(self.onLinkHovered)
 
     def acceptNavigationRequest(self, url, _type, isMainFrame):
-        print(f"acceptNavigationRequest: url={url}, type={_type}, isMainFrame={isMainFrame}")
+        print(f"acceptNavigationRequest: url={url}, type={
+              _type}, isMainFrame={isMainFrame}")
         if url.scheme() == "file":
             return True
         if _type == QWebEnginePage.NavigationTypeLinkClicked:
@@ -28,13 +30,14 @@ class CustomWebEnginePage(QWebEnginePage):
 
     def onLinkHovered(self, url):
         pass
-        #print(f"Link hovered: {url}")
+        # print(f"Link hovered: {url}")
 
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
-        #print(f"JavaScript Console: {message}")
+        # print(f"JavaScript Console: {message}")
         if message.startswith("Link clicked:"):
             url = QUrl(message.split(": ")[1])
             QDesktopServices.openUrl(url)
+
 
 class CustomWebEngineView(QWebEngineView):
     def __init__(self, parent=None):
@@ -57,6 +60,7 @@ class CustomWebEngineView(QWebEngineView):
                 });
             """)
 
+
 class CursoCard(QWidget):
     def __init__(self, curso):
         super().__init__()
@@ -77,7 +81,8 @@ class CursoCard(QWidget):
         progress_bar.setValue(curso['archivosVistos'])
         layout.addWidget(progress_bar)
 
-        progress_label = QLabel(f"{curso['archivosVistos']} / {curso['totalArchivos']} progreso vistos")
+        progress_label = QLabel(
+            f"{curso['archivosVistos']} / {curso['totalArchivos']} progreso vistos")
         progress_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(progress_label)
 
@@ -89,8 +94,12 @@ class CursoCard(QWidget):
 
 
 class CustomVideoWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, curso_tracker=None):
         super().__init__(parent)
+        self.curso_tracker = curso_tracker
+        self.current_video_path = None
+        self.curso_name = None
+        self.last_position = 0  # Añadimos esta variable para almacenar la última posición
         self.setup_ui()
 
     def setup_ui(self):
@@ -103,6 +112,11 @@ class CustomVideoWidget(QWidget):
         self.audio_output = QAudioOutput()
         self.media_player.setAudioOutput(self.audio_output)
         self.media_player.setVideoOutput(self.video_widget)
+        self.media_player.positionChanged.connect(self.save_progress)
+        self.media_player.playbackStateChanged.connect(
+            self.on_playback_state_changed)
+        self.media_player.mediaStatusChanged.connect(
+            self.on_media_status_changed)
 
         controls_layout = QHBoxLayout()
 
@@ -129,7 +143,8 @@ class CustomVideoWidget(QWidget):
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setRange(0, 100)
         self.volume_slider.setValue(50)
-        self.volume_slider.setFixedWidth(60)  # Ajusta este valor según tus preferencias
+        # Ajusta este valor según tus preferencias
+        self.volume_slider.setFixedWidth(60)
         self.volume_slider.valueChanged.connect(self.set_volume)
         volume_layout.addWidget(QLabel("Vol"))
         volume_layout.addWidget(self.volume_slider)
@@ -145,21 +160,26 @@ class CustomVideoWidget(QWidget):
             self.media_player.pause()
             self.play_pause_button.setText("Play")
         else:
+            self.media_player.setPosition(self.last_position)
             self.media_player.play()
             self.play_pause_button.setText("Pause")
 
     def rewind(self):
-        self.media_player.setPosition(max(0, self.media_player.position() - 5000))
+        self.media_player.setPosition(
+            max(0, self.media_player.position() - 5000))
 
     def forward(self):
-        self.media_player.setPosition(min(self.media_player.duration(), self.media_player.position() + 5000))
-
-    def set_position(self, position):
-        self.media_player.setPosition(position)
+        self.media_player.setPosition(
+            min(self.media_player.duration(), self.media_player.position() + 5000))
 
     def position_changed(self, position):
         self.position_slider.setValue(position)
+        self.last_position = position
         self.update_duration_label()
+
+    def set_position(self, position):
+        self.media_player.setPosition(position)
+        self.last_position = position  # Actualizamos la última posición
 
     def duration_changed(self, duration):
         self.position_slider.setRange(0, duration)
@@ -168,18 +188,76 @@ class CustomVideoWidget(QWidget):
     def update_duration_label(self):
         position = self.media_player.position()
         duration = self.media_player.duration()
-        self.duration_label.setText(f"{self.format_time(position)} / {self.format_time(duration)}")
+        self.duration_label.setText(
+            f"{self.format_time(position)} / {self.format_time(duration)}")
 
     def format_time(self, ms):
         s = ms // 1000
         m, s = divmod(s, 60)
         return f"{m:02d}:{s:02d}"
 
-    def set_source(self, url):
-        self.media_player.setSource(url)
-
     def set_volume(self, volume):
         self.audio_output.setVolume(volume / 100.0)
+
+    def set_source(self, url, curso_name):
+        # Guardar el progreso del video actual antes de cambiar
+        self.save_current_progress()
+
+        # Reiniciar las variables para el nuevo video
+        self.current_video_path = url.toLocalFile()
+        self.curso_name = curso_name
+        self.last_position = 0
+        self.position_slider.setValue(0)
+
+        # Establecer la nueva fuente
+        self.media_player.setSource(url)
+
+        # Cargar el progreso del nuevo video
+        self.load_progress()
+
+    def save_current_progress(self):
+        if self.current_video_path and self.curso_name:
+            progress = {
+                "position": self.last_position,
+                "duration": self.media_player.duration()
+            }
+            self.curso_tracker.save_video_progress(
+                self.curso_name, self.current_video_path, progress)
+            print(f"Progreso guardado para {self.current_video_path}: {
+                  self.format_time(self.last_position)}")
+
+    def save_progress(self, position):
+        self.last_position = position
+
+    def load_progress(self):
+        if self.current_video_path and self.curso_name:
+            progress = self.curso_tracker.load_video_progress(
+                self.curso_name, self.current_video_path)
+            if progress:
+                self.last_position = progress.get("position", 0)
+                self.position_slider.setValue(self.last_position)
+                self.update_duration_label()
+                print(f"Video cargado en la posición: {
+                      self.format_time(self.last_position)}")
+            else:
+                self.last_position = 0
+                self.position_slider.setValue(0)
+                print("No se encontró progreso guardado para este video")
+
+    def on_playback_state_changed(self, state):
+        if state == QMediaPlayer.PausedState:
+            self.save_current_progress()
+
+    def on_media_status_changed(self, status):
+        if status == QMediaPlayer.EndOfMedia:
+            self.last_position = self.media_player.duration()
+            self.save_current_progress()
+            print("Video terminado, progreso guardado al final")
+
+    def on_state_changed(self, state):
+        if state == QMediaPlayer.StoppedState:
+            self.save_progress(self.media_player.duration())
+
 
 class CursoTracker(QMainWindow):
     def __init__(self):
@@ -194,8 +272,11 @@ class CursoTracker(QMainWindow):
         self.stacked_widget = QStackedWidget()
         self.layout.addWidget(self.stacked_widget)
 
+        self.video_widget = CustomVideoWidget(curso_tracker=self)
+
         self.setup_ui()
         self.cargar_cursos()
+        self.load_progress_data()
 
     def setup_ui(self):
         # Página principal de cursos
@@ -232,7 +313,6 @@ class CursoTracker(QMainWindow):
         self.content_area = QStackedWidget()
 
         # Área de video
-        self.video_widget = CustomVideoWidget()
         self.content_area.addWidget(self.video_widget)
 
         # Área de HTML
@@ -262,7 +342,8 @@ class CursoTracker(QMainWindow):
 
         for i, (curso_name, curso_data) in enumerate(self.cursos_data.items()):
             curso_card = CursoCard(curso_data)
-            curso_card.mousePressEvent = lambda event, c=curso_name: self.mostrar_detalle_curso(c)
+            curso_card.mousePressEvent = lambda event, c=curso_name: self.mostrar_detalle_curso(
+                c)
             self.grid_layout.addWidget(curso_card, i // 3, i % 3)
 
     def generar_json_cursos(self):
@@ -312,7 +393,8 @@ class CursoTracker(QMainWindow):
                         "tipo": "video" if archivo.lower().endswith(('.mp4', '.avi', '.mov')) else "html",
                         "visto": False
                     })
-            archivos[seccion] = sorted(archivos[seccion], key=lambda x: self.ordenar_clave(x['nombre']))
+            archivos[seccion] = sorted(
+                archivos[seccion], key=lambda x: self.ordenar_clave(x['nombre']))
         return archivos
 
     def ordenar_clave(self, nombre):
@@ -330,30 +412,60 @@ class CursoTracker(QMainWindow):
         for seccion, archivos in self.cursos_data[curso_name]['archivos'].items():
             seccion_item = QTreeWidgetItem(self.tree_widget, [seccion])
             for archivo in archivos:
-                icon = QIcon("path_to_html_icon.png") if archivo['tipo'] == 'html' else QIcon("path_to_video_icon.png")
-                archivo_item = QTreeWidgetItem(seccion_item, [archivo['nombre']])
+                icon = QIcon("path_to_html_icon.png") if archivo['tipo'] == 'html' else QIcon(
+                    "path_to_video_icon.png")
+                archivo_item = QTreeWidgetItem(
+                    seccion_item, [archivo['nombre']])
                 archivo_item.setIcon(0, icon)
-                archivo_item.setData(0, Qt.UserRole, os.path.join(self.cursos_data[curso_name]['ruta'], seccion, archivo['nombre']))
+                archivo_item.setData(0, Qt.UserRole, os.path.join(
+                    self.cursos_data[curso_name]['ruta'], seccion, archivo['nombre']))
 
         self.stacked_widget.setCurrentWidget(self.curso_detail_page)
 
+    def load_progress_data(self):
+        try:
+            with open("progress_data.json", "r", encoding="utf-8") as f:
+                self.progress_data = json.load(f)
+        except FileNotFoundError:
+            print("Archivo progress_data.json no encontrado. Creando uno nuevo.")
+            self.progress_data = {}
+            self.save_progress_data()
+
+    def load_video_progress(self, curso_name, video_path):
+        return self.progress_data.get(curso_name, {}).get(video_path)
+
+    def save_video_progress(self, curso_name, video_path, progress):
+        if curso_name not in self.progress_data:
+            self.progress_data[curso_name] = {}
+        self.progress_data[curso_name][video_path] = progress
+        self.save_progress_data()
+
+    def save_progress_data(self):
+        with open("progress_data.json", "w", encoding="utf-8") as f:
+            json.dump(self.progress_data, f, ensure_ascii=False, indent=2)
+
     def mostrar_archivo(self, item):
+        curso_name = self.tree_widget.topLevelItem(0).text(0)
         ruta_archivo = item.data(0, Qt.UserRole)
         if ruta_archivo:
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
-                self.video_widget.set_source(QUrl.fromLocalFile(ruta_archivo))
+                self.video_widget.set_source(
+                    QUrl.fromLocalFile(ruta_archivo), curso_name)
                 self.content_area.setCurrentWidget(self.video_widget)
-                self.video_widget.media_player.play()
+                # self.video_widget.media_player.play()
             elif ruta_archivo.lower().endswith('.html'):
-                url = QUrl(f"file:///{QDir.fromNativeSeparators(ruta_archivo)}")
+                url = QUrl(
+                    f"file:///{QDir.fromNativeSeparators(ruta_archivo)}")
                 print(f"Cargando archivo: {url}")
-                #self.web_view.load(url)
+                # self.web_view.load(url)
                 self.web_view.setUrl(url)
                 self.content_area.setCurrentWidget(self.web_view)
-                self.web_view.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+                self.web_view.setSizePolicy(
+                    QSizePolicy.Expanding, QSizePolicy.Expanding)
                 self.web_view.setZoomFactor(1.0)
             else:
-                self.text_browser.setText(f"Archivo no soportado: {ruta_archivo}")
+                self.text_browser.setText(
+                    f"Archivo no soportado: {ruta_archivo}")
                 self.content_area.setCurrentWidget(self.text_browser)
 
     def agregar_carpeta(self):
@@ -377,6 +489,11 @@ class CursoTracker(QMainWindow):
                 json.dump(self.cursos_data, f, ensure_ascii=False, indent=2)
 
             self.actualizar_grid_cursos()
+
+    def closeEvent(self, event):
+        self.video_widget.save_current_progress()
+        super().closeEvent(event)
+
 
 if __name__ == "__main__":
     import sys
