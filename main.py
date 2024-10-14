@@ -4,7 +4,7 @@ import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,QHBoxLayout, QPushButton, QFileDialog,
                                QLabel, QStackedWidget, QScrollArea, QGridLayout,
-                               QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox)
+                               QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider)
 from PySide6.QtCore import Qt, QSize, QUrl, QDir
 from PySide6.QtGui import QIcon, QDesktopServices
 from PySide6.QtWebEngineWidgets import QWebEngineView
@@ -87,6 +87,100 @@ class CursoCard(QWidget):
         self.setFixedSize(200, 250)
         self.setStyleSheet("border-radius: 10px;")
 
+
+class CustomVideoWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        self.video_widget = QVideoWidget()
+        layout.addWidget(self.video_widget)
+
+        self.media_player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.media_player.setAudioOutput(self.audio_output)
+        self.media_player.setVideoOutput(self.video_widget)
+
+        controls_layout = QHBoxLayout()
+
+        self.play_pause_button = QPushButton("Play")
+        self.play_pause_button.clicked.connect(self.play_pause)
+        controls_layout.addWidget(self.play_pause_button)
+
+        self.rewind_button = QPushButton("<<")
+        self.rewind_button.clicked.connect(self.rewind)
+        controls_layout.addWidget(self.rewind_button)
+
+        self.forward_button = QPushButton(">>")
+        self.forward_button.clicked.connect(self.forward)
+        controls_layout.addWidget(self.forward_button)
+
+        self.position_slider = QSlider(Qt.Horizontal)
+        self.position_slider.sliderMoved.connect(self.set_position)
+        controls_layout.addWidget(self.position_slider, 1)
+
+        self.duration_label = QLabel("00:00 / 00:00")
+        controls_layout.addWidget(self.duration_label)
+
+        volume_layout = QHBoxLayout()
+        self.volume_slider = QSlider(Qt.Horizontal)
+        self.volume_slider.setRange(0, 100)
+        self.volume_slider.setValue(50)
+        self.volume_slider.setFixedWidth(60)  # Ajusta este valor según tus preferencias
+        self.volume_slider.valueChanged.connect(self.set_volume)
+        volume_layout.addWidget(QLabel("Vol"))
+        volume_layout.addWidget(self.volume_slider)
+        controls_layout.addLayout(volume_layout)
+
+        layout.addLayout(controls_layout)
+
+        self.media_player.positionChanged.connect(self.position_changed)
+        self.media_player.durationChanged.connect(self.duration_changed)
+
+    def play_pause(self):
+        if self.media_player.playbackState() == QMediaPlayer.PlayingState:
+            self.media_player.pause()
+            self.play_pause_button.setText("Play")
+        else:
+            self.media_player.play()
+            self.play_pause_button.setText("Pause")
+
+    def rewind(self):
+        self.media_player.setPosition(max(0, self.media_player.position() - 5000))
+
+    def forward(self):
+        self.media_player.setPosition(min(self.media_player.duration(), self.media_player.position() + 5000))
+
+    def set_position(self, position):
+        self.media_player.setPosition(position)
+
+    def position_changed(self, position):
+        self.position_slider.setValue(position)
+        self.update_duration_label()
+
+    def duration_changed(self, duration):
+        self.position_slider.setRange(0, duration)
+        self.update_duration_label()
+
+    def update_duration_label(self):
+        position = self.media_player.position()
+        duration = self.media_player.duration()
+        self.duration_label.setText(f"{self.format_time(position)} / {self.format_time(duration)}")
+
+    def format_time(self, ms):
+        s = ms // 1000
+        m, s = divmod(s, 60)
+        return f"{m:02d}:{s:02d}"
+
+    def set_source(self, url):
+        self.media_player.setSource(url)
+
+    def set_volume(self, volume):
+        self.audio_output.setVolume(volume / 100.0)
+
 class CursoTracker(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -138,11 +232,7 @@ class CursoTracker(QMainWindow):
         self.content_area = QStackedWidget()
 
         # Área de video
-        self.video_widget = QVideoWidget()
-        self.media_player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.media_player.setAudioOutput(self.audio_output)
-        self.media_player.setVideoOutput(self.video_widget)
+        self.video_widget = CustomVideoWidget()
         self.content_area.addWidget(self.video_widget)
 
         # Área de HTML
@@ -251,10 +341,9 @@ class CursoTracker(QMainWindow):
         ruta_archivo = item.data(0, Qt.UserRole)
         if ruta_archivo:
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
-                self.media_player.setSource(QUrl.fromLocalFile(ruta_archivo))
+                self.video_widget.set_source(QUrl.fromLocalFile(ruta_archivo))
                 self.content_area.setCurrentWidget(self.video_widget)
-                self.audio_output.setVolume(50)  # Ajusta el volumen al 50%
-                self.media_player.play()
+                self.video_widget.media_player.play()
             elif ruta_archivo.lower().endswith('.html'):
                 url = QUrl(f"file:///{QDir.fromNativeSeparators(ruta_archivo)}")
                 print(f"Cargando archivo: {url}")
