@@ -59,8 +59,8 @@ class VideoItemWidget(QWidget):
 
         progress = self.curso_tracker.load_video_progress(
             self.curso_name, ruta_archivo)
-        print(f"Cargando progreso para: {ruta_archivo}")
-        print(f"Progreso encontrado: {progress}")
+        # print(f"Cargando progreso para: {ruta_archivo}")
+        # print(f"Progreso encontrado: {progress}")
 
         if progress:
             position = progress.get("position", 0)
@@ -70,7 +70,7 @@ class VideoItemWidget(QWidget):
             print(f"Progreso establecido: {progreso:.2f}%")
         else:
             self.progress_bar.setValue(0)
-            print("No se encontró progreso, estableciendo a 0%")
+            # print("No se encontró progreso, estableciendo a 0%")
 
     def on_checkbox_clicked(self):
         is_checked = self.checkbox.isChecked()
@@ -313,22 +313,25 @@ class CustomVideoWidget(QWidget):
         self.audio_output.setVolume(volume / 100.0)
 
     def set_source(self, url, curso_name):
+        new_video_path = url.toLocalFile()
+
+        # Si es el mismo video, no hacemos nada
+        if self.current_video_path == new_video_path:
+            return
+
         # Guardar el progreso del video actual antes de cambiar
         self.save_current_progress()
 
-        # Reiniciar las variables para el nuevo video
-        self.current_video_path = url.toLocalFile()
-        self.curso_name = curso_name
-        self.last_position = 0
-        self.position_slider.setValue(0)
-        self.video_completed = False
-        self.end_of_media_processed = False
-
         # Establecer la nueva fuente
+        self.current_video_path = new_video_path
+        self.curso_name = curso_name
         self.media_player.setSource(url)
 
         # Cargar el progreso del nuevo video
         self.load_progress()
+
+        # Actualizar la interfaz
+        self.update_ui()
 
     def save_current_progress(self):
         if self.current_video_path and self.curso_name:
@@ -343,6 +346,40 @@ class CustomVideoWidget(QWidget):
 
     def save_progress(self, position):
         self.last_position = position
+
+    def update_ui(self):
+        # Actualizar la interfaz sin reiniciar el reproductor
+        current_position = self.media_player.position()
+        self.position_slider.setValue(current_position)
+        self.update_duration_label()
+
+        # Emitir señal con el progreso actual
+        duration = self.media_player.duration()
+        if duration > 0:
+            progress = (current_position / duration) * 100
+            self.progress_updated.emit(
+                self.curso_name, self.current_video_path, progress)
+
+    def update_ui_with_progress(self, progress):
+        if progress:
+            position = progress.get("position", 0)
+            duration = progress.get("duration", 1)
+            self.media_player.setPosition(position)
+            self.last_position = position
+            self.position_slider.setRange(0, duration)
+            self.position_slider.setValue(position)
+            self.update_duration_label()
+
+            # Emitir señal con el progreso actual
+            if duration > 0:
+                progress_percentage = (position / duration) * 100
+                self.progress_updated.emit(
+                    self.curso_name, self.current_video_path, progress_percentage)
+        else:
+            self.position_slider.setValue(0)
+            self.update_duration_label()
+            self.progress_updated.emit(
+                self.curso_name, self.current_video_path, 0)
 
     def load_progress(self):
         if self.current_video_path and self.curso_name:
@@ -663,7 +700,7 @@ class CursoTracker(QMainWindow):
                 if os.path.normpath(path) == video_path:
                     print(f"Progreso encontrado para {video_path}: {progress}")
                     return progress
-        print(f"No se encontró progreso para {video_path}")
+        # print(f"No se encontró progreso para {video_path}")
         return None
 
     def save_video_progress(self, curso_name, video_path, progress):
@@ -681,27 +718,37 @@ class CursoTracker(QMainWindow):
             print("Error: No hay curso seleccionado")
             return
 
-        # Obtener el widget del item
         widget = self.tree_widget.itemWidget(item, 0)
-        if widget is None:
+        if not isinstance(widget, (VideoItemWidget, FileItemWidget)):
             return
 
-        # Obtener el nombre del archivo
-        if isinstance(widget, VideoItemWidget) or isinstance(widget, FileItemWidget):
-            nombre_archivo = widget.nombre_label.text()
-        else:
-            return
-
-        # Construir la ruta completa del archivo
+        nombre_archivo = widget.nombre_label.text()
         ruta_curso = self.cursos_data[self.curso_actual]['ruta']
         seccion = item.parent().text(0) if item.parent() else 'Principal'
         ruta_archivo = os.path.join(ruta_curso, seccion, nombre_archivo)
 
         if os.path.exists(ruta_archivo):
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
-                self.video_widget.set_source(
-                    QUrl.fromLocalFile(ruta_archivo), self.curso_actual)
-                self.content_area.setCurrentWidget(self.video_widget)
+                # Cargar el progreso guardado
+                progress = self.load_video_progress(
+                    self.curso_actual, ruta_archivo)
+
+                if self.video_widget.current_video_path != ruta_archivo:
+                    # Si es un video diferente, establecer una nueva fuente
+                    self.video_widget.set_source(
+                        QUrl.fromLocalFile(ruta_archivo), self.curso_actual)
+                    self.content_area.setCurrentWidget(self.video_widget)
+
+                # Actualizar la interfaz del reproductor de video
+                self.video_widget.update_ui_with_progress(progress)
+
+                # Actualizar el progreso en la barra del VideoItemWidget
+                if progress:
+                    widget.update_progress(progress.get(
+                        "position", 0) / progress.get("duration", 1) * 100)
+                else:
+                    widget.update_progress(0)
+
             elif ruta_archivo.lower().endswith('.html'):
                 url = QUrl(
                     f"file:///{QDir.fromNativeSeparators(ruta_archivo)}")
