@@ -20,31 +20,49 @@ class VideoItemWidget(QWidget):
     def __init__(self, archivo, curso_name, curso_tracker, marcar_callback):
         super().__init__()
 
-        layout = QHBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
+        # Configuración del layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 5, 10, 5)
+        main_layout.setSpacing(5)
 
-        vertical_layout = QVBoxLayout(self)
-        vertical_layout.setContentsMargins(0, 10, 10, 10)
+        self.setMinimumHeight(50)
+
+        # Layout horizontal para checkbox y nombre
+        top_layout = QHBoxLayout()
+        top_layout.setSpacing(5)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(archivo['visto'])
         self.checkbox.clicked.connect(self.on_checkbox_clicked)
+        top_layout.addWidget(self.checkbox)
+
+        self.nombre_label = QLabel(archivo['nombre'])
+        self.nombre_label.setWordWrap(True)
+        self.nombre_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.nombre_label.setStyleSheet(
+            "font-size: 12px;")
+        # Añade factor de estiramiento
+        top_layout.addWidget(self.nombre_label, 1)
+
+        main_layout.addLayout(top_layout)
+
+        # Configuración de la barra de progreso
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setTextVisible(False)
+        # Aumenta el grosor de la barra de progreso
+        self.progress_bar.setFixedHeight(10)
+        self.progress_bar.setStyleSheet(
+            "QProgressBar { border: 1px solid #2596be; border-radius: 5px; height: 10px; background-color: #f3f4f6; }"
+            "QProgressBar::chunk { background-color: #2596be; }"
+        )
+        main_layout.addWidget(self.progress_bar)
+
         self.marcar_callback = marcar_callback
         self.archivo = archivo
         self.curso_name = curso_name
         self.curso_tracker = curso_tracker
-        layout.addWidget(self.checkbox)
-
-        self.nombre_label = QLabel(archivo['nombre'])
-        self.nombre_label.setWordWrap(True)
-        layout.addWidget(self.nombre_label)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setTextVisible(False)
-
-        vertical_layout.addLayout(layout)
-        vertical_layout.addWidget(self.progress_bar)
 
         self.load_progress()
 
@@ -84,19 +102,34 @@ class FileItemWidget(QWidget):
 
     def __init__(self, archivo, visto, marcar_callback):
         super().__init__()
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 10, 10, 10)
+
+        # Configuración del layout principal
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 5, 5, 5)
+        main_layout.setSpacing(5)
+
+        self.setMinimumHeight(50)
+
+        # Layout horizontal para checkbox y nombre
+        top_layout = QHBoxLayout()
+        # Reduce el espacio entre el checkbox y el texto
+        top_layout.setSpacing(5)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(visto)
         self.checkbox.clicked.connect(self.on_checkbox_clicked)
-        self.marcar_callback = marcar_callback
-        self.archivo = archivo
-        layout.addWidget(self.checkbox)
+        top_layout.addWidget(self.checkbox)
 
         self.nombre_label = QLabel(archivo['nombre'])
         self.nombre_label.setWordWrap(True)
-        layout.addWidget(self.nombre_label)
+        self.nombre_label.setSizePolicy(
+            QSizePolicy.Expanding, QSizePolicy.Preferred)
+        top_layout.addWidget(self.nombre_label, 1)
+
+        main_layout.addLayout(top_layout)
+
+        self.marcar_callback = marcar_callback
+        self.archivo = archivo
 
     def on_checkbox_clicked(self):
         is_checked = self.checkbox.isChecked()
@@ -159,38 +192,72 @@ class CursoCard(QWidget):
         super().__init__()
         self.curso = curso
         self.icon_manager = icon_manager
-        layout = QVBoxLayout(self)
+        main_layout = QWidget(self)
+        layout = QVBoxLayout()
+
+        # Contenedor para icono y nombre
+        top_container = QWidget()
+        top_layout = QHBoxLayout(top_container)
+        top_layout.setContentsMargins(0, 0, 0, 0)
 
         self.icon_label = QLabel()
         self.update_icon(curso['icon'])
-        layout.addWidget(self.icon_label, alignment=Qt.AlignCenter)
+        top_layout.addWidget(self.icon_label)
 
         name_label = QLabel(curso['name'])
         name_label.setWordWrap(True)
+        name_label.setStyleSheet("font-size: 14px; font-weight: bold;")
         name_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(name_label)
+        top_layout.addWidget(name_label, 1)
+
+        change_icon_btn = QPushButton("Cambiar icono")
+        change_icon_btn.clicked.connect(self.change_icon)
+        change_icon_btn.setCursor(Qt.PointingHandCursor)
+        layout.addWidget(top_container)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, self.curso['totalArchivos'])
         self.progress_bar.setValue(self.curso['archivosVistos'])
+        self.progress_bar.setTextVisible(False)
         layout.addWidget(self.progress_bar)
 
         self.progress_label = QLabel(
-            f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} archivos vistos")
+            f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} videos vistos")
         self.progress_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.progress_label)
-
-        change_icon_btn = QPushButton("Cambiar icono")
-        change_icon_btn.clicked.connect(self.change_icon)
         layout.addWidget(change_icon_btn)
 
-        self.setFixedSize(200, 250)
-        self.setStyleSheet("border-radius: 10px;")
+        main_layout.setLayout(layout)
+
+        self.setFixedSize(300, 150)
+        self.setStyleSheet("""
+            QWidget {
+                border-radius: 10px;
+                background-color: #f3f4f6;
+            }
+            QLabel {
+                font-size: 14px;
+                color: #2596be;
+            }
+            QPushButton { font-size: 12px; color: #ffffff; border: 1px solid #2596be; border-radius: 5px; padding: 5px 10px; background-color: #2596be; font-weight: bold;}
+            QPushButton:hover { background-color: #1f78a4; }
+            QPushButton:pressed { background-color: #1a628a; }
+            QProgressBar {
+                border: 1px solid #2596be;
+                border-radius: 5px;
+                background-color: #f3f4f6;
+                height: 10px;
+                text-align: center;
+            }
+            QProgressBar::chunk {
+                background-color: #2596be;
+            }
+        """)
 
     def actualizar_progreso(self):
         self.progress_bar.setValue(self.curso['archivosVistos'])
         self.progress_label.setText(
-            f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} archivos vistos")
+            f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} videos vistos")
 
     def update_icon(self, icon_name):
         icon = self.icon_manager.get_icon(icon_name, size=50)
@@ -199,7 +266,7 @@ class CursoCard(QWidget):
     def change_icon(self):
         dialog = IconSelectorDialog(self.icon_manager, self)
         dialog.icon_selected.connect(self.on_icon_selected)
-        dialog.exec_()
+        dialog.exec()
 
     def on_icon_selected(self, icon_name):
         self.update_icon(icon_name)
@@ -449,6 +516,7 @@ class CursoTracker(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         self.curso_actual = None
         self.icon_manager = IconManager()
+        self.icon_manager.report_problematic_icons()
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -503,6 +571,7 @@ class CursoTracker(QMainWindow):
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderHidden(True)
         self.tree_widget.itemClicked.connect(self.mostrar_archivo)
+        self.tree_widget.setStyleSheet("QTreeWidget::item { height: 30px; }")
         tree_layout.addWidget(self.tree_widget)
 
         # Crear el botón "Volver al Inicio"
@@ -613,20 +682,40 @@ class CursoTracker(QMainWindow):
         print("Datos de cursos guardados en cursos_data.json")
 
     def actualizar_grid_cursos(self):
+        # Limpiar el grid layout
         for i in reversed(range(self.grid_layout.count())):
             self.grid_layout.itemAt(i).widget().setParent(None)
 
-        for i, (curso_name, curso_data) in enumerate(self.cursos_data.items()):
+        # Calcular el número de columnas basado en el ancho de la ventana
+        ancho_ventana = self.width()
+        ancho_tarjeta = 300  # Ancho de cada tarjeta de curso
+        # 20 es el espacio entre tarjetas
+        columnas = max(1, ancho_ventana // (ancho_tarjeta + 20))
+
+        # Agregar las tarjetas de curso al grid
+        row = 0
+        col = 0
+        for curso_name, curso_data in self.cursos_data.items():
             curso_card = CursoCard(curso_data, self.icon_manager)
             curso_card.mousePressEvent = lambda event, c=curso_name: self.mostrar_detalle_curso(
                 c)
             curso_card.icon_changed.connect(self.update_curso_icon)
-            self.grid_layout.addWidget(curso_card, i // 3, i % 3)
+            self.grid_layout.addWidget(curso_card, row, col)
+
+            col += 1
+            if col >= columnas:
+                col = 0
+                row += 1
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.actualizar_grid_cursos()
 
     def update_curso_icon(self, curso_id, new_icon):
         if curso_id in self.cursos_data:
             self.cursos_data[curso_id]['icon'] = new_icon
             self.guardar_cursos_data()
+            self.actualizar_grid_cursos()
 
     def generar_json_cursos(self):
         ruta_cursos = "cursos_videos"
