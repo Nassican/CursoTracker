@@ -11,6 +11,7 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
 from PySide6.QtMultimediaWidgets import QVideoWidget
+from icon_manager import IconManager, IconSelectorDialog
 
 
 class VideoItemWidget(QWidget):
@@ -152,14 +153,17 @@ class CustomWebEngineView(QWebEngineView):
 
 
 class CursoCard(QWidget):
-    def __init__(self, curso):
+    icon_changed = Signal(str, str)
+
+    def __init__(self, curso, icon_manager):
         super().__init__()
         self.curso = curso
+        self.icon_manager = icon_manager
         layout = QVBoxLayout(self)
 
-        icon_label = QLabel()
-        icon_label.setPixmap(QIcon("path_to_icon.png").pixmap(QSize(50, 50)))
-        layout.addWidget(icon_label, alignment=Qt.AlignCenter)
+        self.icon_label = QLabel()
+        self.update_icon(curso['icon'])
+        layout.addWidget(self.icon_label, alignment=Qt.AlignCenter)
 
         name_label = QLabel(curso['name'])
         name_label.setWordWrap(True)
@@ -177,6 +181,7 @@ class CursoCard(QWidget):
         layout.addWidget(self.progress_label)
 
         change_icon_btn = QPushButton("Cambiar icono")
+        change_icon_btn.clicked.connect(self.change_icon)
         layout.addWidget(change_icon_btn)
 
         self.setFixedSize(200, 250)
@@ -186,6 +191,19 @@ class CursoCard(QWidget):
         self.progress_bar.setValue(self.curso['archivosVistos'])
         self.progress_label.setText(
             f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} archivos vistos")
+
+    def update_icon(self, icon_name):
+        icon = self.icon_manager.get_icon(icon_name, size=50)
+        self.icon_label.setPixmap(icon.pixmap(50, 50))
+
+    def change_icon(self):
+        dialog = IconSelectorDialog(self.icon_manager, self)
+        dialog.icon_selected.connect(self.on_icon_selected)
+        dialog.exec_()
+
+    def on_icon_selected(self, icon_name):
+        self.update_icon(icon_name)
+        self.icon_changed.emit(self.curso['id'], icon_name)
 
 
 class CustomVideoWidget(QWidget):
@@ -430,6 +448,7 @@ class CursoTracker(QMainWindow):
         self.setWindowTitle("Seguimiento de Cursos")
         self.setGeometry(100, 100, 1200, 800)
         self.curso_actual = None
+        self.icon_manager = IconManager()
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -598,10 +617,16 @@ class CursoTracker(QMainWindow):
             self.grid_layout.itemAt(i).widget().setParent(None)
 
         for i, (curso_name, curso_data) in enumerate(self.cursos_data.items()):
-            curso_card = CursoCard(curso_data)
+            curso_card = CursoCard(curso_data, self.icon_manager)
             curso_card.mousePressEvent = lambda event, c=curso_name: self.mostrar_detalle_curso(
                 c)
+            curso_card.icon_changed.connect(self.update_curso_icon)
             self.grid_layout.addWidget(curso_card, i // 3, i % 3)
+
+    def update_curso_icon(self, curso_id, new_icon):
+        if curso_id in self.cursos_data:
+            self.cursos_data[curso_id]['icon'] = new_icon
+            self.guardar_cursos_data()
 
     def generar_json_cursos(self):
         ruta_cursos = "cursos_videos"

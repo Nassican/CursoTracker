@@ -2,4 +2,6 @@
 cursos_data.json
 progress_data.json
 
+__pycache__
+
 cursos_videos/
