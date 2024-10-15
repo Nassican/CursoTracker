@@ -576,10 +576,6 @@ class CursoTracker(QMainWindow):
         self.curso_detail_page = QWidget()
         curso_detail_layout = QHBoxLayout(self.curso_detail_page)
 
-        # Página de detalle del curso
-        self.curso_detail_page = QWidget()
-        curso_detail_layout = QHBoxLayout(self.curso_detail_page)
-
         # Crear un widget para contener el árbol y el botón
         tree_container = QWidget()
         tree_layout = QVBoxLayout(tree_container)
@@ -740,7 +736,8 @@ class CursoTracker(QMainWindow):
         for curso in os.listdir(ruta_cursos):
             ruta_curso = os.path.join(ruta_cursos, curso)
             if os.path.isdir(ruta_curso):
-                total_archivos = self.contar_archivos(ruta_curso)
+                archivos = self.obtener_archivos(ruta_curso)
+                total_archivos = sum(len(files) for files in archivos.values())
                 self.cursos_data[curso] = {
                     "id": curso,
                     "name": curso,
@@ -748,7 +745,7 @@ class CursoTracker(QMainWindow):
                     "totalArchivos": total_archivos,
                     "archivosVistos": 0,
                     "icon": "folder/folder-color",
-                    "archivos": self.obtener_archivos(ruta_curso),
+                    "archivos": archivos,
                     "progress": {},
                     "ruta": ruta_curso
                 }
@@ -767,22 +764,37 @@ class CursoTracker(QMainWindow):
         return total
 
     def obtener_archivos(self, ruta):
+        def ordenar_clave(nombre):
+            match = re.match(r'^(\d+)', nombre)
+            if match:
+                numero = int(match.group(1))
+                resto = nombre[match.end():].lower()
+                return (numero, resto)
+            else:
+                return (float('inf'), nombre.lower())
         archivos = {}
         for raiz, dirs, archivos_lista in os.walk(ruta):
             seccion = os.path.relpath(raiz, ruta)
-            if seccion == '.':
-                seccion = 'Principal'
-            archivos[seccion] = []
+            archivos_seccion = []
             for archivo in archivos_lista:
                 if archivo.lower().endswith(('.mp4', '.avi', '.mov', '.html')):
-                    archivos[seccion].append({
+                    archivos_seccion.append({
                         "nombre": archivo,
                         "tipo": "video" if archivo.lower().endswith(('.mp4', '.avi', '.mov')) else "html",
-                        "visto": False
+                        "visto": False,
+                        "seccion": seccion
                     })
-            archivos[seccion] = sorted(
-                archivos[seccion], key=lambda x: self.ordenar_clave(x['nombre']))
-        return archivos
+
+            if archivos_seccion:
+                if seccion == '.':
+                    seccion = 'Principal'
+                archivos[seccion] = sorted(
+                    archivos_seccion, key=lambda x: ordenar_clave(x['nombre']))
+
+        # Ordenar las secciones
+        archivos_ordenados = dict(
+            sorted(archivos.items(), key=lambda x: ordenar_clave(x[0])))
+        return archivos_ordenados
 
     def ordenar_clave(self, nombre):
         match = re.search(r'^(\d+)', nombre)
