@@ -16,7 +16,7 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 class VideoItemWidget(QWidget):
     checkbox_changed = Signal(bool, object)
 
-    def __init__(self, archivo, progreso, visto, marcar_callback):
+    def __init__(self, archivo, curso_name, curso_tracker, marcar_callback):
         super().__init__()
 
         layout = QHBoxLayout()
@@ -26,11 +26,12 @@ class VideoItemWidget(QWidget):
         vertical_layout.setContentsMargins(0, 10, 10, 10)
 
         self.checkbox = QCheckBox()
-        self.checkbox.setChecked(visto)
-        # Cambiamos stateChanged por clicked
+        self.checkbox.setChecked(archivo['visto'])
         self.checkbox.clicked.connect(self.on_checkbox_clicked)
         self.marcar_callback = marcar_callback
         self.archivo = archivo
+        self.curso_name = curso_name
+        self.curso_tracker = curso_tracker
         layout.addWidget(self.checkbox)
 
         self.nombre_label = QLabel(archivo['nombre'])
@@ -39,11 +40,34 @@ class VideoItemWidget(QWidget):
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(int(progreso * 100))
         self.progress_bar.setTextVisible(False)
 
         vertical_layout.addLayout(layout)
         vertical_layout.addWidget(self.progress_bar)
+
+        self.load_progress()
+
+    def load_progress(self):
+        ruta_curso = self.curso_tracker.cursos_data[self.curso_name]['ruta']
+        seccion = self.archivo.get('seccion', 'Principal')
+        ruta_archivo = os.path.join(
+            ruta_curso, seccion, self.archivo['nombre'])
+        ruta_archivo = os.path.normpath(ruta_archivo)  # Normalizar la ruta
+
+        progress = self.curso_tracker.load_video_progress(
+            self.curso_name, ruta_archivo)
+        print(f"Cargando progreso para: {ruta_archivo}")
+        print(f"Progreso encontrado: {progress}")
+
+        if progress:
+            position = progress.get("position", 0)
+            duration = progress.get("duration", 1)  # Evitar división por cero
+            progreso = (position / duration) * 100 if duration > 0 else 0
+            self.progress_bar.setValue(int(progreso))
+            print(f"Progreso establecido: {progreso:.2f}%")
+        else:
+            self.progress_bar.setValue(0)
+            print("No se encontró progreso, estableciendo a 0%")
 
     def on_checkbox_clicked(self):
         is_checked = self.checkbox.isChecked()
@@ -560,12 +584,12 @@ class CursoTracker(QMainWindow):
             seccion_item = QTreeWidgetItem(self.tree_widget, [seccion])
             for archivo in archivos:
                 archivo_item = QTreeWidgetItem(seccion_item)
+                archivo['seccion'] = seccion  # Añadir la sección al archivo
                 if archivo['tipo'] == 'video':
                     widget = VideoItemWidget(
                         archivo,
-                        self.cursos_data[curso_name]['progress'].get(
-                            archivo['nombre'], {}).get('progreso', 0),
-                        archivo['visto'],
+                        curso_name,
+                        self,
                         self.marcar_archivo
                     )
                 else:
@@ -600,7 +624,14 @@ class CursoTracker(QMainWindow):
             self.save_progress_data()
 
     def load_video_progress(self, curso_name, video_path):
-        return self.progress_data.get(curso_name, {}).get(video_path)
+        video_path = os.path.normpath(video_path)
+        if curso_name in self.progress_data:
+            for path, progress in self.progress_data[curso_name].items():
+                if os.path.normpath(path) == video_path:
+                    print(f"Progreso encontrado para {video_path}: {progress}")
+                    return progress
+        print(f"No se encontró progreso para {video_path}")
+        return None
 
     def save_video_progress(self, curso_name, video_path, progress):
         if curso_name not in self.progress_data:
