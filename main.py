@@ -192,28 +192,37 @@ class CursoCard(QWidget):
         super().__init__()
         self.curso = curso
         self.icon_manager = icon_manager
-        main_layout = QWidget(self)
-        layout = QVBoxLayout()
+        self.setup_ui()
 
-        # Contenedor para icono y nombre
-        top_container = QWidget()
-        top_layout = QHBoxLayout(top_container)
-        top_layout.setContentsMargins(0, 0, 0, 0)
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(5)
 
+        # Contenedor principal con borde
+        container = QWidget(self)
+        container.setObjectName("cursoCardContainer")
+        container.setStyleSheet("""
+            #cursoCardContainer {
+                border: 1px solid #ddd;
+                border-radius: 8px;
+            }
+        """)
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(10, 10, 10, 10)
+        container_layout.setSpacing(5)
+
+        # Icono
         self.icon_label = QLabel()
-        self.update_icon(curso['icon'])
-        top_layout.addWidget(self.icon_label)
+        self.update_icon(self.curso['icon'])
+        container_layout.addWidget(self.icon_label, alignment=Qt.AlignCenter)
 
-        name_label = QLabel(curso['name'])
-        name_label.setWordWrap(True)
-        name_label.setStyleSheet("font-size: 14px; font-weight: bold;")
+        # Nombre del curso
+        name_label = QLabel(self.curso['name'])
         name_label.setAlignment(Qt.AlignCenter)
-        top_layout.addWidget(name_label, 1)
-
-        change_icon_btn = QPushButton("Cambiar icono")
-        change_icon_btn.clicked.connect(self.change_icon)
-        change_icon_btn.setCursor(Qt.PointingHandCursor)
-        layout.addWidget(top_container)
+        name_label.setWordWrap(True)
+        name_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        container_layout.addWidget(name_label)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, self.curso['totalArchivos'])
@@ -221,15 +230,21 @@ class CursoCard(QWidget):
         self.progress_bar.setTextVisible(False)
         layout.addWidget(self.progress_bar)
 
-        self.progress_label = QLabel(
+        container_layout.addWidget(self.progress_bar)
+
+        # Etiqueta de progreso
+        progress_label = QLabel(
             f"{self.curso['archivosVistos']} / {self.curso['totalArchivos']} videos vistos")
-        self.progress_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self.progress_label)
-        layout.addWidget(change_icon_btn)
+        progress_label.setAlignment(Qt.AlignCenter)
+        container_layout.addWidget(progress_label)
 
-        main_layout.setLayout(layout)
+        # Botón para cambiar icono
+        change_icon_button = QPushButton("Cambiar icono")
+        change_icon_button.clicked.connect(self.change_icon)
+        container_layout.addWidget(change_icon_button)
 
-        self.setFixedSize(300, 150)
+        layout.addWidget(container)
+        self.setFixedSize(200, 250)
         self.setStyleSheet("""
             QWidget {
                 border-radius: 10px;
@@ -237,19 +252,20 @@ class CursoCard(QWidget):
             }
             QLabel {
                 font-size: 14px;
-                color: #2596be;
+                color: #000000;
             }
-            QPushButton { font-size: 12px; color: #ffffff; border: 1px solid #2596be; border-radius: 5px; padding: 5px 10px; background-color: #2596be; font-weight: bold;}
+            QPushButton { font-size: 14px; color: #ffffff; border: 1px solid #2596be; border-radius: 5px; padding: 5px 10px; background-color: #2596be; font-weight: bold;}
             QPushButton:hover { background-color: #1f78a4; }
             QPushButton:pressed { background-color: #1a628a; }
             QProgressBar {
-                border: 1px solid #2596be;
+                border: 1px solid #384052;
                 border-radius: 5px;
-                background-color: #f3f4f6;
+                background-color: #384052;
                 height: 10px;
                 text-align: center;
             }
             QProgressBar::chunk {
+                border-radius: 5px;
                 background-color: #2596be;
             }
         """)
@@ -731,7 +747,7 @@ class CursoTracker(QMainWindow):
                     "description": f"Descripción del curso {curso}",
                     "totalArchivos": total_archivos,
                     "archivosVistos": 0,
-                    "icon": "SiNextdotjs",
+                    "icon": "folder/folder-color",
                     "archivos": self.obtener_archivos(ruta_curso),
                     "progress": {},
                     "ruta": ruta_curso
@@ -907,7 +923,7 @@ class CursoTracker(QMainWindow):
                 "description": f"Descripción del curso {nombre_curso}",
                 "totalArchivos": total_archivos,
                 "archivosVistos": 0,
-                "icon": "SiNextdotjs",
+                "icon": "folder/folder-color",
                 "archivos": self.obtener_archivos(carpeta),
                 "progress": {},
                 "ruta": carpeta
