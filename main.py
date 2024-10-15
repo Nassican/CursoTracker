@@ -198,7 +198,6 @@ class CustomVideoWidget(QWidget):
         self.curso_name = None
         self.last_position = 0  # Añadimos esta variable para almacenar la última posición
         self.end_of_media_processed = False
-        self.video_completed = False
         self.media_player = QMediaPlayer()
         self.media_player.mediaStatusChanged.connect(
             self.on_media_status_changed)
@@ -413,6 +412,9 @@ class CustomVideoWidget(QWidget):
             if self.curso_name and self.current_video_path:
                 self.curso_tracker.marcar_video_como_visto(
                     self.curso_name, self.current_video_path)
+                # Emitir señal para marcar el checkbox como visto
+                self.curso_tracker.marcar_archivo_como_visto(
+                    self.current_video_path)
             else:
                 print("Error: curso_name o current_video_path no están definidos")
             print("Video terminado, marcado como visto y progreso guardado al final")
@@ -507,6 +509,21 @@ class CursoTracker(QMainWindow):
         curso_detail_layout.addWidget(self.content_area, 2)
 
         self.stacked_widget.addWidget(self.curso_detail_page)
+
+    def marcar_archivo_como_visto(self, video_path):
+        # Buscar el VideoItemWidget correspondiente y marcar el checkbox
+        for i in range(self.tree_widget.topLevelItemCount()):
+            seccion_item = self.tree_widget.topLevelItem(i)
+            for j in range(seccion_item.childCount()):
+                archivo_item = seccion_item.child(j)
+                widget = self.tree_widget.itemWidget(archivo_item, 0)
+                if isinstance(widget, VideoItemWidget):
+                    ruta_completa = os.path.join(self.cursos_data[self.curso_actual]['ruta'],
+                                                 widget.archivo['seccion'],
+                                                 widget.archivo['nombre'])
+                    if os.path.normpath(ruta_completa) == os.path.normpath(video_path):
+                        widget.checkbox.setChecked(True)
+                        return
 
     def update_video_progress(self, curso_name, video_path, progress):
         # Buscar el VideoItemWidget correspondiente y actualizar su barra de progreso
