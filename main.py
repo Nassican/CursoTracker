@@ -47,6 +47,9 @@ class VideoItemWidget(QWidget):
 
         self.load_progress()
 
+    def update_progress(self, progress):
+        self.progress_bar.setValue(int(progress))
+
     def load_progress(self):
         ruta_curso = self.curso_tracker.cursos_data[self.curso_name]['ruta']
         seccion = self.archivo.get('seccion', 'Principal')
@@ -186,6 +189,8 @@ class CursoCard(QWidget):
 
 
 class CustomVideoWidget(QWidget):
+    progress_updated = Signal(str, str, float)
+
     def __init__(self, parent=None, curso_tracker=None):
         super().__init__(parent)
         self.curso_tracker = curso_tracker
@@ -255,6 +260,12 @@ class CustomVideoWidget(QWidget):
         if self.media_player.playbackState() == QMediaPlayer.PlayingState:
             self.media_player.pause()
             self.play_pause_button.setText("Play")
+            # Emitir señal con el progreso actual al pausar
+            if self.media_player.duration() > 0:
+                progress = (self.last_position /
+                            self.media_player.duration()) * 100
+                self.progress_updated.emit(
+                    self.curso_name, self.current_video_path, progress)
         else:
             self.media_player.setPosition(self.last_position)
             self.media_player.play()
@@ -272,6 +283,12 @@ class CustomVideoWidget(QWidget):
         self.position_slider.setValue(position)
         self.last_position = position
         self.update_duration_label()
+
+        # Emitir señal con el progreso actual
+        if self.media_player.duration() > 0:
+            progress = (position / self.media_player.duration()) * 100
+            self.progress_updated.emit(
+                self.curso_name, self.current_video_path, progress)
 
     def set_position(self, position):
         self.media_player.setPosition(position)
@@ -383,6 +400,7 @@ class CursoTracker(QMainWindow):
         self.layout.addWidget(self.stacked_widget)
 
         self.video_widget = CustomVideoWidget(curso_tracker=self)
+        self.video_widget.progress_updated.connect(self.update_video_progress)
 
         self.setup_ui()
         self.cargar_cursos()
@@ -452,6 +470,21 @@ class CursoTracker(QMainWindow):
         curso_detail_layout.addWidget(self.content_area, 2)
 
         self.stacked_widget.addWidget(self.curso_detail_page)
+
+    def update_video_progress(self, curso_name, video_path, progress):
+        # Buscar el VideoItemWidget correspondiente y actualizar su barra de progreso
+        for i in range(self.tree_widget.topLevelItemCount()):
+            seccion_item = self.tree_widget.topLevelItem(i)
+            for j in range(seccion_item.childCount()):
+                archivo_item = seccion_item.child(j)
+                widget = self.tree_widget.itemWidget(archivo_item, 0)
+                if isinstance(widget, VideoItemWidget):
+                    ruta_completa = os.path.join(self.cursos_data[curso_name]['ruta'],
+                                                 widget.archivo['seccion'],
+                                                 widget.archivo['nombre'])
+                    if os.path.normpath(ruta_completa) == os.path.normpath(video_path):
+                        widget.update_progress(progress)
+                        return
 
     def volver_al_inicio(self):
         self.stacked_widget.setCurrentWidget(self.cursos_page)
