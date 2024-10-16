@@ -535,9 +535,27 @@ class CursoTracker(QMainWindow):
         self.icon_manager = IconManager()
         self.icon_manager.report_problematic_icons()
 
+        self.setStyleSheet("""
+            QMainWindow, QWidget {
+                background-color: white;
+                color: black;
+            }
+            QPushButton {
+                background-color: #2596be;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #1c7430;
+            }
+        """)
+
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
+        self.layout.setContentsMargins(0, 0, 0, 0)
 
         self.stacked_widget = QStackedWidget()
         self.layout.addWidget(self.stacked_widget)
@@ -576,11 +594,12 @@ class CursoTracker(QMainWindow):
         # Página de detalle del curso
         self.curso_detail_page = QWidget()
         curso_detail_layout = QHBoxLayout(self.curso_detail_page)
+        curso_detail_layout.setContentsMargins(0, 0, 0, 0)
 
         # Crear un widget para contener el árbol y el botón
         tree_container = QWidget()
         tree_layout = QVBoxLayout(tree_container)
-        tree_layout.setContentsMargins(0, 0, 0, 0)
+        tree_layout.setContentsMargins(10, 10, 0, 10)
 
         # Añadir widget para mostrar el icono y nombre del curso
         self.curso_info_widget = QWidget()
@@ -628,12 +647,12 @@ class CursoTracker(QMainWindow):
 
         right_container = QWidget()
         right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setContentsMargins(0, 10, 0, 0)
 
         # Crear el breadcrumb
         self.breadcrumb_label = QLabel()
         self.breadcrumb_label.setStyleSheet("""
-            font-size: 12px;
+            font-size: 14px;
             color: #666;
             padding: 10px;
             margin-left: 10px;
@@ -925,8 +944,8 @@ class CursoTracker(QMainWindow):
 
         # Añade estas líneas al final del método
         curso_data = self.cursos_data[curso_name]
-        icon = self.icon_manager.get_icon(curso_data['icon'], size=128)
-        self.curso_info_icon.setPixmap(icon.pixmap(128, 128))
+        icon = self.icon_manager.get_icon(curso_data['icon'], size=256)
+        self.curso_info_icon.setPixmap(icon.pixmap(256, 256))
         self.curso_info_name.setText(curso_data['name'])
         self.content_area.setCurrentWidget(self.curso_info_widget)
         self.stacked_widget.setCurrentWidget(self.curso_detail_page)
