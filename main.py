@@ -585,7 +585,7 @@ class CursoTracker(QMainWindow):
         # Añadir widget para mostrar el icono y nombre del curso
         self.curso_info_widget = QWidget()
         curso_info_layout = QHBoxLayout(self.curso_info_widget)
-        curso_info_layout.setContentsMargins(10, 10, 10, 10)
+        curso_info_layout.setContentsMargins(0, 0, 0, 0)
         self.curso_icon_label = QLabel()
         self.curso_name_label = QLabel()
         self.curso_name_label.setWordWrap(True)
@@ -623,10 +623,31 @@ class CursoTracker(QMainWindow):
         tree_layout.addWidget(self.tree_widget)
         tree_layout.addWidget(self.btn_volver_inicio)
 
+        right_container = QWidget()
+        right_layout = QVBoxLayout(right_container)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Crear el breadcrumb
+        self.breadcrumb_label = QLabel()
+        self.breadcrumb_label.setStyleSheet("""
+            font-size: 12px;
+            color: #666;
+            padding: 10px;
+            margin-left: 10px;
+            margin-right: 10px;
+            background-color: #f0f0f0;
+            border-radius: 3px;
+        """)
+        self.breadcrumb_label.setContentsMargins(10, 0, 10, 0)
+        right_layout.addWidget(self.breadcrumb_label)
+
+        # Añadir el content_area al right_container
+        right_layout.addWidget(self.content_area)
+
         # Crear un QSplitter para permitir ajustar el ancho del tree_container
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.addWidget(tree_container)
-        self.splitter.addWidget(self.content_area)
+        self.splitter.addWidget(right_container)
         # Hace que el content_area se expanda más que el tree_container
         self.splitter.setStretchFactor(1, 1)
         self.splitter.splitterMoved.connect(
@@ -930,6 +951,9 @@ class CursoTracker(QMainWindow):
         seccion = item.parent().text(0) if item.parent() else 'Principal'
         ruta_archivo = os.path.join(ruta_curso, seccion, nombre_archivo)
 
+        breadcrumb = self.crear_breadcrumb(
+            self.curso_actual, seccion, nombre_archivo)
+
         if os.path.exists(ruta_archivo):
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
                 # Cargar el progreso guardado
@@ -941,6 +965,8 @@ class CursoTracker(QMainWindow):
                     self.video_widget.set_source(
                         QUrl.fromLocalFile(ruta_archivo), self.curso_actual)
                     self.content_area.setCurrentWidget(self.video_widget)
+
+                self.actualizar_breadcrumb(breadcrumb)
 
                 # Actualizar la interfaz del reproductor de video
                 self.video_widget.update_ui_with_progress(progress)
@@ -961,12 +987,25 @@ class CursoTracker(QMainWindow):
                 self.web_view.setSizePolicy(
                     QSizePolicy.Expanding, QSizePolicy.Expanding)
                 self.web_view.setZoomFactor(1.0)
+
+                self.actualizar_breadcrumb(breadcrumb)
             else:
                 self.text_browser.setText(
                     f"Archivo no soportado: {ruta_archivo}")
                 self.content_area.setCurrentWidget(self.text_browser)
+
+                self.actualizar_breadcrumb(breadcrumb)
         else:
             print(f"El archivo no existe: {ruta_archivo}")
+
+    def crear_breadcrumb(self, curso_name, seccion, nombre_archivo):
+        if seccion == 'Principal':
+            return f"{curso_name} > {nombre_archivo}"
+        else:
+            return f"{curso_name} > ... > {nombre_archivo}"
+
+    def actualizar_breadcrumb(self, breadcrumb):
+        self.breadcrumb_label.setText(breadcrumb)
 
     def agregar_carpeta(self):
         carpeta = QFileDialog.getExistingDirectory(self, "Seleccionar Carpeta")
