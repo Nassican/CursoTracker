@@ -391,15 +391,26 @@ class CustomVideoWidget(QWidget):
 
         controls_layout = QHBoxLayout()
 
-        self.play_pause_button = QPushButton("Play")
+        self.play_pause_button = QPushButton()
+        self.play_pause_button.setIcon(
+            QIcon("public/faplay.svg"))
+        self.play_pause_button.setFixedSize(30, 30)
         self.play_pause_button.clicked.connect(self.play_pause)
         controls_layout.addWidget(self.play_pause_button)
 
-        self.rewind_button = QPushButton("<<")
+        self.rewind_button = QPushButton()
+        self.rewind_button.setCursor(Qt.PointingHandCursor)
+        self.rewind_button.setIcon(
+            QIcon("public/tabler-rewind-backward-5.svg"))
+        self.rewind_button.setFixedSize(30, 30)
         self.rewind_button.clicked.connect(self.rewind)
         controls_layout.addWidget(self.rewind_button)
 
-        self.forward_button = QPushButton(">>")
+        self.forward_button = QPushButton()
+        self.forward_button.setCursor(Qt.PointingHandCursor)
+        self.forward_button.setIcon(
+            QIcon("public/tabler-rewind-forward-5.svg"))
+        self.forward_button.setFixedSize(30, 30)
         self.forward_button.clicked.connect(self.forward)
         controls_layout.addWidget(self.forward_button)
 
@@ -411,8 +422,12 @@ class CustomVideoWidget(QWidget):
         controls_layout.addWidget(self.duration_label)
 
         self.fullscreen_button = QPushButton()
-        self.fullscreen_button.setIcon(QIcon("path/to/fullscreen_icon.png"))
+        self.fullscreen_button.setCursor(Qt.PointingHandCursor)
+        self.fullscreen_button.setIcon(
+            QIcon("public/dashicons-fullscreen-alt.svg"))
         self.fullscreen_button.setObjectName("fullscreenButton")
+        self.fullscreen_button.setFixedSize(30, 30)
+        self.fullscreen_button.clicked.connect(self.full_screen)
         controls_layout.addWidget(self.fullscreen_button)
 
         volume_layout = QHBoxLayout()
@@ -455,7 +470,8 @@ class CustomVideoWidget(QWidget):
     def play_pause(self):
         if self.media_player.playbackState() == QMediaPlayer.PlayingState:
             self.media_player.pause()
-            self.play_pause_button.setText("Play")
+            self.play_pause_button.setIcon(
+                QIcon("public/faplay.svg"))
             # Emitir señal con el progreso actual al pausar
             if self.media_player.duration() > 0:
                 progress = (self.last_position /
@@ -465,7 +481,8 @@ class CustomVideoWidget(QWidget):
         else:
             self.media_player.setPosition(self.last_position)
             self.media_player.play()
-            self.play_pause_button.setText("Pause")
+            self.play_pause_button.setIcon(
+                QIcon("public/fapause.svg"))
 
     def full_screen(self):
         # Funcion para poner en pantalla completa y salir de la misma
