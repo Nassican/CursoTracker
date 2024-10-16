@@ -1070,6 +1070,10 @@ class CursoTracker(QMainWindow):
         breadcrumb = self.crear_breadcrumb(
             self.curso_actual, seccion, nombre_archivo)
 
+        # Pausar el video actual si se está reproduciendo
+        if self.video_widget.media_player.playbackState() == QMediaPlayer.PlayingState:
+            self.video_widget.media_player.pause()
+
         if os.path.exists(ruta_archivo):
             if ruta_archivo.lower().endswith(('.mp4', '.avi', '.mov')):
                 # Cargar el progreso guardado
