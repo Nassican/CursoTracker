@@ -4,9 +4,9 @@ import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog,
     QLabel, QStackedWidget, QScrollArea, QGridLayout,
-    QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider, QCheckBox)
-from PySide6.QtCore import Qt, QSize, QUrl, QDir, Signal
-from PySide6.QtGui import QIcon, QDesktopServices
+    QProgressBar, QTreeWidget, QTreeWidgetItem, QTextBrowser, QSizePolicy, QMessageBox, QSlider, QCheckBox, QSplitter)
+from PySide6.QtCore import Qt, QSize, QUrl, QDir, Signal, QTimer
+from PySide6.QtGui import QIcon, QDesktopServices, QFontMetrics
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -531,6 +531,7 @@ class CursoTracker(QMainWindow):
         self.setWindowTitle("Seguimiento de Cursos")
         self.setGeometry(100, 100, 1200, 800)
         self.curso_actual = None
+        self.splitter = None
         self.icon_manager = IconManager()
         self.icon_manager.report_problematic_icons()
 
@@ -579,19 +580,32 @@ class CursoTracker(QMainWindow):
         # Crear un widget para contener el árbol y el botón
         tree_container = QWidget()
         tree_layout = QVBoxLayout(tree_container)
+        tree_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Añadir widget para mostrar el icono y nombre del curso
+        self.curso_info_widget = QWidget()
+        curso_info_layout = QHBoxLayout(self.curso_info_widget)
+        curso_info_layout.setContentsMargins(10, 10, 10, 10)
+        self.curso_icon_label = QLabel()
+        self.curso_name_label = QLabel()
+        self.curso_name_label.setWordWrap(True)
+        curso_info_layout.addWidget(self.curso_icon_label)
+        curso_info_layout.addWidget(self.curso_name_label, 1)
+        tree_layout.addWidget(self.curso_info_widget)
 
         self.tree_widget = QTreeWidget()
         self.tree_widget.setHeaderHidden(True)
+        self.tree_widget.setWordWrap(True)
         self.tree_widget.itemClicked.connect(self.mostrar_archivo)
         self.tree_widget.setStyleSheet("QTreeWidget::item { height: 30px; }")
         tree_layout.addWidget(self.tree_widget)
-
         # Crear el botón "Volver al Inicio"
         self.btn_volver_inicio = QPushButton("Volver al Inicio")
         self.btn_volver_inicio.clicked.connect(self.volver_al_inicio)
-        tree_layout.addWidget(self.btn_volver_inicio)
 
-        curso_detail_layout.addWidget(tree_container, 1)
+        tree_layout.addWidget(self.tree_widget)
+
+        # Crear un QSplitter para permitir ajustar el ancho del tree_container
 
         self.content_area = QStackedWidget()
 
@@ -606,7 +620,19 @@ class CursoTracker(QMainWindow):
         self.text_browser = QTextBrowser()
         self.content_area.addWidget(self.text_browser)
 
-        curso_detail_layout.addWidget(self.content_area, 2)
+        tree_layout.addWidget(self.tree_widget)
+        tree_layout.addWidget(self.btn_volver_inicio)
+
+        # Crear un QSplitter para permitir ajustar el ancho del tree_container
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(tree_container)
+        self.splitter.addWidget(self.content_area)
+        # Hace que el content_area se expanda más que el tree_container
+        self.splitter.setStretchFactor(1, 1)
+        self.splitter.splitterMoved.connect(
+            self.ajustar_titulo_curso)  # Conecta la señal splitterMoved
+
+        curso_detail_layout.addWidget(self.splitter)
 
         self.stacked_widget.addWidget(self.curso_detail_page)
 
@@ -809,6 +835,24 @@ class CursoTracker(QMainWindow):
         self.curso_actual = curso_name
         self.tree_widget.clear()
 
+        # Actualizar el icono y nombre del curso
+        curso_data = self.cursos_data[curso_name]
+        icon = self.icon_manager.get_icon(curso_data['icon'], size=32)
+        self.curso_icon_label.setPixmap(icon.pixmap(32, 32))
+        self.curso_name_label.setText(curso_data['name'])
+        self.curso_name_label.setStyleSheet("""
+            font-size: 18px;
+            font-weight: bold;
+            qproperty-alignment: AlignLeft | AlignVCenter;
+        """)
+
+        # Forzar el layout a actualizarse
+        self.curso_info_widget.adjustSize()
+        self.curso_info_widget.updateGeometry()
+
+        # Programar el ajuste del título para después de que se haya actualizado el layout
+        QTimer.singleShot(0, self.ajustar_titulo_curso)
+
         for seccion, archivos in self.cursos_data[curso_name]['archivos'].items():
             seccion_item = QTreeWidgetItem(self.tree_widget, [seccion])
             for archivo in archivos:
@@ -945,6 +989,27 @@ class CursoTracker(QMainWindow):
                 json.dump(self.cursos_data, f, ensure_ascii=False, indent=2)
 
             self.actualizar_grid_cursos()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.actualizar_grid_cursos()
+        self.ajustar_titulo_curso()
+
+    def ajustar_titulo_curso(self):
+        if hasattr(self, 'curso_name_label') and self.curso_actual:
+            curso_data = self.cursos_data[self.curso_actual]
+            nombre_original = curso_data['name']
+            available_width = self.curso_info_widget.width() - self.curso_icon_label.width()
+            font = self.curso_name_label.font()
+            font_metrics = QFontMetrics(font)
+
+            # Comprobar si el texto original cabe en el espacio disponible
+            if font_metrics.horizontalAdvance(nombre_original) <= available_width:
+                self.curso_name_label.setText(nombre_original)
+            else:
+                elided_text = font_metrics.elidedText(
+                    nombre_original, Qt.ElideRight, available_width)
+                self.curso_name_label.setText(elided_text)
 
     def closeEvent(self, event):
         self.video_widget.save_current_progress()
