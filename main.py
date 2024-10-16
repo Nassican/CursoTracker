@@ -22,14 +22,14 @@ class VideoItemWidget(QWidget):
 
         # Configuración del layout principal
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 5, 10, 5)
+        main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(5)
 
         self.setMinimumHeight(50)
 
         # Layout horizontal para checkbox y nombre
         top_layout = QHBoxLayout()
-        top_layout.setSpacing(5)
+        top_layout.setSpacing(0)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(archivo['visto'])
@@ -620,6 +620,9 @@ class CursoTracker(QMainWindow):
         self.text_browser = QTextBrowser()
         self.content_area.addWidget(self.text_browser)
 
+        self.curso_info_widget = self.crear_curso_info_widget()
+        self.content_area.addWidget(self.curso_info_widget)
+
         tree_layout.addWidget(self.tree_widget)
         tree_layout.addWidget(self.btn_volver_inicio)
 
@@ -656,6 +659,32 @@ class CursoTracker(QMainWindow):
         curso_detail_layout.addWidget(self.splitter)
 
         self.stacked_widget.addWidget(self.curso_detail_page)
+
+    def crear_curso_info_widget(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setAlignment(Qt.AlignCenter)
+        layout.setSpacing(10)  # Reduce el espacio entre los elementos
+
+        # Contenedor para el icono y el nombre
+        icon_name_container = QWidget()
+        icon_name_layout = QHBoxLayout(icon_name_container)
+        icon_name_layout.setAlignment(Qt.AlignCenter)
+        icon_name_layout.setSpacing(20)  # Espacio entre el icono y el nombre
+
+        self.curso_info_icon = QLabel()
+        self.curso_info_icon.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        layout.addWidget(self.curso_info_icon)
+
+        self.curso_info_name = QLabel()
+        self.curso_info_name.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self.curso_info_name.setStyleSheet(
+            "font-size: 24px; font-weight: bold;")
+        icon_name_layout.addWidget(self.curso_info_name)
+
+        layout.addWidget(icon_name_container)
+
+        return widget
 
     def marcar_archivo_como_visto(self, video_path):
         # Buscar el VideoItemWidget correspondiente y marcar el checkbox
@@ -894,6 +923,12 @@ class CursoTracker(QMainWindow):
                     )
                 self.tree_widget.setItemWidget(archivo_item, 0, widget)
 
+        # Añade estas líneas al final del método
+        curso_data = self.cursos_data[curso_name]
+        icon = self.icon_manager.get_icon(curso_data['icon'], size=128)
+        self.curso_info_icon.setPixmap(icon.pixmap(128, 128))
+        self.curso_info_name.setText(curso_data['name'])
+        self.content_area.setCurrentWidget(self.curso_info_widget)
         self.stacked_widget.setCurrentWidget(self.curso_detail_page)
         self.btn_volver_inicio.show()
 
@@ -997,6 +1032,9 @@ class CursoTracker(QMainWindow):
                 self.actualizar_breadcrumb(breadcrumb)
         else:
             print(f"El archivo no existe: {ruta_archivo}")
+            self.content_area.setCurrentWidget(self.curso_info_widget)
+
+        self.actualizar_breadcrumb(breadcrumb)
 
     def crear_breadcrumb(self, curso_name, seccion, nombre_archivo):
         if seccion == 'Principal':
