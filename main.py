@@ -33,6 +33,9 @@ class VideoItemWidget(QWidget):
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(archivo['visto'])
+        self.checkbox.setFixedSize(18, 18)
+        self.checkbox.setStyleSheet(
+            "border: 1px solid #2596be; border-radius: 5px;")
         self.checkbox.clicked.connect(self.on_checkbox_clicked)
         top_layout.addWidget(self.checkbox)
 
@@ -41,7 +44,7 @@ class VideoItemWidget(QWidget):
         self.nombre_label.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.nombre_label.setStyleSheet(
-            "font-size: 12px;")
+            "font-size: 12px; padding-left: 10px;")
         # Añade factor de estiramiento
         top_layout.addWidget(self.nombre_label, 1)
 
@@ -96,13 +99,23 @@ class VideoItemWidget(QWidget):
         self.marcar_callback(self.archivo, is_checked)
         self.checkbox_changed.emit(is_checked, self.archivo)
 
+    def setSelected(self, selected):
+        if selected:
+            self.setStyleSheet("""
+                QLabel {
+                    font-weight: bold;
+                    padding-left: 10px;
+                }
+            """)
+        else:
+            self.setStyleSheet("")
+
 
 class FileItemWidget(QWidget):
     checkbox_changed = Signal(bool, object)
 
     def __init__(self, archivo, visto, marcar_callback):
         super().__init__()
-
         # Configuración del layout principal
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 5, 5, 5)
@@ -112,11 +125,13 @@ class FileItemWidget(QWidget):
 
         # Layout horizontal para checkbox y nombre
         top_layout = QHBoxLayout()
-        # Reduce el espacio entre el checkbox y el texto
-        top_layout.setSpacing(5)
+        top_layout.setSpacing(0)
 
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(visto)
+        self.checkbox.setFixedSize(18, 18)
+        self.checkbox.setStyleSheet(
+            "border: 1px solid #2596be; border-radius: 5px;")
         self.checkbox.clicked.connect(self.on_checkbox_clicked)
         top_layout.addWidget(self.checkbox)
 
@@ -124,6 +139,7 @@ class FileItemWidget(QWidget):
         self.nombre_label.setWordWrap(True)
         self.nombre_label.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.nombre_label.setStyleSheet("font-size: 12px; padding-left: 10px;")
         top_layout.addWidget(self.nombre_label, 1)
 
         main_layout.addLayout(top_layout)
@@ -135,6 +151,17 @@ class FileItemWidget(QWidget):
         is_checked = self.checkbox.isChecked()
         self.marcar_callback(self.archivo, is_checked)
         self.checkbox_changed.emit(is_checked, self.archivo)
+
+    def setSelected(self, selected):
+        if selected:
+            self.setStyleSheet("""
+                QLabel {
+                    font-weight: bold;
+                    padding-left: 10px;
+                }
+            """)
+        else:
+            self.setStyleSheet("")
 
 
 class CustomWebEnginePage(QWebEnginePage):
@@ -192,11 +219,12 @@ class CursoCard(QWidget):
         super().__init__()
         self.curso = curso
         self.icon_manager = icon_manager
+        self.setCursor(Qt.PointingHandCursor)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(5)
 
         # Contenedor principal con borde
@@ -221,7 +249,7 @@ class CursoCard(QWidget):
         name_label = QLabel(self.curso['name'])
         name_label.setAlignment(Qt.AlignCenter)
         name_label.setWordWrap(True)
-        name_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        name_label.setStyleSheet(" font-size: 14px;")
         container_layout.addWidget(name_label)
 
         self.progress_bar = QProgressBar()
@@ -302,10 +330,12 @@ class CustomVideoWidget(QWidget):
         self.media_player = QMediaPlayer()
         self.media_player.mediaStatusChanged.connect(
             self.on_media_status_changed)
+        self.setContentsMargins(0, 0, 0, 0)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         self.video_widget = QVideoWidget()
         layout.addWidget(self.video_widget)
@@ -540,15 +570,24 @@ class CursoTracker(QMainWindow):
                 background-color: white;
                 color: black;
             }
-            QPushButton {
-                background-color: #2596be;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
+            QPushButton { font-size: 14px; color: #ffffff; border: 1px solid #2596be; border-radius: 5px; padding: 5px 10px; background-color: #2596be; font-weight: bold;}
+            QPushButton:hover { background-color: #1f78a4; }
+            QPushButton:pressed { background-color: #1a628a; }
+            QScrollArea { border: 1px solid #2596be; border-radius: 5px; padding: 10px; }
+            QScrollBar:vertical { width: 5px; }
+            QScrollBar::handle:vertical { background-color: #2596be; border-radius: 5px; }
+            QScrollBar::handle:vertical:hover { background-color: #1f78a4; }
+            QScrollBar::handle:vertical:pressed { background-color: #1a628a; }
+            QTreeWidget {
+                font-size: 12px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                border: 1px solid #1f78a4;
+                border-radius: 10px;
             }
-            QPushButton:hover {
-                background-color: #1c7430;
+            QTreeWidget::item {
+                height: 30px;
+                padding-right: 10px;
             }
         """)
 
@@ -573,9 +612,21 @@ class CursoTracker(QMainWindow):
         self.cursos_page = QWidget()
         cursos_layout = QVBoxLayout(self.cursos_page)
 
+        layout_title = QHBoxLayout()
+        layout_title.setContentsMargins(0, 0, 0, 0)
+
         titulo = QLabel("Cursos disponibles")
         titulo.setStyleSheet("font-size: 24px; font-weight: bold;")
-        cursos_layout.addWidget(titulo)
+
+        self.btn_agregar_carpeta = QPushButton("Agregar Carpeta")
+        self.btn_agregar_carpeta.clicked.connect(self.agregar_carpeta)
+        self.btn_agregar_carpeta.setFixedWidth(200)
+        self.btn_agregar_carpeta.setCursor(Qt.PointingHandCursor)
+
+        layout_title.addWidget(titulo)
+        layout_title.addWidget(self.btn_agregar_carpeta)
+
+        cursos_layout.addLayout(layout_title)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -584,10 +635,6 @@ class CursoTracker(QMainWindow):
         self.cursos_grid = QWidget()
         self.grid_layout = QGridLayout(self.cursos_grid)
         scroll_area.setWidget(self.cursos_grid)
-
-        self.btn_agregar_carpeta = QPushButton("Agregar Carpeta")
-        self.btn_agregar_carpeta.clicked.connect(self.agregar_carpeta)
-        cursos_layout.addWidget(self.btn_agregar_carpeta)
 
         self.stacked_widget.addWidget(self.cursos_page)
 
@@ -620,6 +667,7 @@ class CursoTracker(QMainWindow):
         tree_layout.addWidget(self.tree_widget)
         # Crear el botón "Volver al Inicio"
         self.btn_volver_inicio = QPushButton("Volver al Inicio")
+        self.btn_volver_inicio.setCursor(Qt.PointingHandCursor)
         self.btn_volver_inicio.clicked.connect(self.volver_al_inicio)
 
         tree_layout.addWidget(self.tree_widget)
@@ -647,7 +695,7 @@ class CursoTracker(QMainWindow):
 
         right_container = QWidget()
         right_layout = QVBoxLayout(right_container)
-        right_layout.setContentsMargins(0, 10, 0, 0)
+        right_layout.setContentsMargins(0, 10, 10, 10)
 
         # Crear el breadcrumb
         self.breadcrumb_label = QLabel()
@@ -942,6 +990,9 @@ class CursoTracker(QMainWindow):
                     )
                 self.tree_widget.setItemWidget(archivo_item, 0, widget)
 
+        self.tree_widget.itemSelectionChanged.connect(
+            self.on_item_selection_changed)
+
         # Añade estas líneas al final del método
         curso_data = self.cursos_data[curso_name]
         icon = self.icon_manager.get_icon(curso_data['icon'], size=256)
@@ -950,6 +1001,17 @@ class CursoTracker(QMainWindow):
         self.content_area.setCurrentWidget(self.curso_info_widget)
         self.stacked_widget.setCurrentWidget(self.curso_detail_page)
         self.btn_volver_inicio.show()
+
+    def on_item_selection_changed(self):
+        for item in self.tree_widget.selectedItems():
+            widget = self.tree_widget.itemWidget(item, 0)
+            if isinstance(widget, (VideoItemWidget, FileItemWidget)):
+                widget.setSelected(True)
+
+        for item in self.tree_widget.findItems("", Qt.MatchContains | Qt.MatchRecursive):
+            widget = self.tree_widget.itemWidget(item, 0)
+            if isinstance(widget, (VideoItemWidget, FileItemWidget)) and item not in self.tree_widget.selectedItems():
+                widget.setSelected(False)
 
     def marcar_archivo(self, archivo, checked):
         if archivo['visto'] != checked:
