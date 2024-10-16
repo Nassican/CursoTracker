@@ -14,6 +14,46 @@ from PySide6.QtMultimediaWidgets import QVideoWidget
 from icon_manager import IconManager, IconSelectorDialog
 
 
+class EmptyCourseWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        empty_widget = QWidget()
+        empty_widget.setContentsMargins(20, 20, 20, 20)
+
+        empty_layout = QVBoxLayout(empty_widget)
+
+        message_label = QLabel("No hay cursos disponibles.")
+        message_label.setStyleSheet(
+            "font-size: 18px; color: #666; padding:20px")
+
+        add_button = QPushButton("Agrega tu curso favorito")
+        add_button.setFixedWidth(200)
+        add_button.setFixedHeight(30)
+        add_button.setCursor(Qt.PointingHandCursor)
+        add_button.setStyleSheet("""
+            QPushButton { font-size: 14px; color: #ffffff; border: 1px solid #2596be; border-radius: 5px; padding: 5px 10px; background-color: #2596be; font-weight: bold;}
+            QPushButton:hover { background-color: #1f78a4; }
+            QPushButton:pressed { background-color: #1a628a; }
+        """)
+
+        add_button.clicked.connect(self.parent().agregar_carpeta)
+
+        empty_layout.addWidget(message_label, alignment=Qt.AlignCenter)
+        empty_layout.addWidget(add_button, alignment=Qt.AlignCenter)
+
+        layout.addWidget(empty_widget, alignment=Qt.AlignCenter)
+
+        self.setStyleSheet("""
+            background-color: #f0f0f0;
+            border-radius: 10px;
+        """)
+
+
 class VideoItemWidget(QWidget):
     checkbox_changed = Signal(bool, object)
 
@@ -370,6 +410,11 @@ class CustomVideoWidget(QWidget):
         self.duration_label = QLabel("00:00 / 00:00")
         controls_layout.addWidget(self.duration_label)
 
+        self.fullscreen_button = QPushButton()
+        self.fullscreen_button.setIcon(QIcon("path/to/fullscreen_icon.png"))
+        self.fullscreen_button.setObjectName("fullscreenButton")
+        controls_layout.addWidget(self.fullscreen_button)
+
         volume_layout = QHBoxLayout()
         self.volume_slider = QSlider(Qt.Horizontal)
         self.volume_slider.setRange(0, 100)
@@ -386,6 +431,27 @@ class CustomVideoWidget(QWidget):
         self.media_player.positionChanged.connect(self.position_changed)
         self.media_player.durationChanged.connect(self.duration_changed)
 
+        self.setStyleSheet("""
+            QPushButton { font-size: 14px; color: #ffffff; border: 1px solid #2596be; border-radius: 5px; padding: 5px 10px; background-color: #2596be; font-weight: bold;}
+            QPushButton:hover { background-color: #1f78a4; }
+            QPushButton:pressed { background-color: #1a628a; }
+            QSlider::groove:horizontal {
+                border: 1px solid #5c5c5c;
+                border-radius: 5px;
+                height: 8px;
+                background: #cccccc;
+                margin: 2px 0;
+            }
+            QSlider::handle:horizontal {
+                background: #1f78a4;
+                border: 1px solid #5c5c5c;
+                width: 18px;
+                height: 18px;
+                margin: -6px 0;
+                border-radius: 10px;
+            }
+        """)
+
     def play_pause(self):
         if self.media_player.playbackState() == QMediaPlayer.PlayingState:
             self.media_player.pause()
@@ -400,6 +466,11 @@ class CustomVideoWidget(QWidget):
             self.media_player.setPosition(self.last_position)
             self.media_player.play()
             self.play_pause_button.setText("Pause")
+
+    def full_screen(self):
+        # Funcion para poner en pantalla completa y salir de la misma
+        print("Full screen")
+        pass
 
     def rewind(self):
         self.media_player.setPosition(
@@ -562,6 +633,8 @@ class CursoTracker(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         self.curso_actual = None
         self.splitter = None
+        self.empty_course_widget = EmptyCourseWidget(self)
+        self.empty_course_widget.hide()
         self.icon_manager = IconManager()
         self.icon_manager.report_problematic_icons()
 
@@ -794,10 +867,11 @@ class CursoTracker(QMainWindow):
         try:
             with open("cursos_data.json", "r", encoding="utf-8") as f:
                 self.cursos_data = json.load(f)
-
             self.actualizar_grid_cursos()
         except FileNotFoundError:
-            self.generar_json_cursos()
+            print(
+                "No se encontró el archivo cursos_data.json. Iniciando con una lista de cursos vacía.")
+            self.cursos_data = {}
 
     def marcar_video_como_visto(self, curso_name, video_path):
         print(f"Intentando marcar como visto: {video_path}")
@@ -841,6 +915,13 @@ class CursoTracker(QMainWindow):
         for i in reversed(range(self.grid_layout.count())):
             self.grid_layout.itemAt(i).widget().setParent(None)
 
+        if not self.cursos_data:
+            self.empty_course_widget.show()
+            self.grid_layout.addWidget(self.empty_course_widget)
+            return
+
+        self.empty_course_widget.hide()
+
         # Calcular el número de columnas basado en el ancho de la ventana
         ancho_ventana = self.width()
         ancho_tarjeta = 300  # Ancho de cada tarjeta de curso
@@ -873,6 +954,7 @@ class CursoTracker(QMainWindow):
             self.actualizar_grid_cursos()
 
     def generar_json_cursos(self):
+        """
         ruta_cursos = "cursos_videos"
         self.cursos_data = {}
 
@@ -897,6 +979,8 @@ class CursoTracker(QMainWindow):
             json.dump(self.cursos_data, f, ensure_ascii=False, indent=2)
 
         self.actualizar_grid_cursos()
+        """
+        pass
 
     def contar_archivos(self, ruta):
         total = 0
@@ -1131,9 +1215,15 @@ class CursoTracker(QMainWindow):
         self.breadcrumb_label.setText(breadcrumb)
 
     def agregar_carpeta(self):
-        carpeta = QFileDialog.getExistingDirectory(self, "Seleccionar Carpeta")
+        carpeta = QFileDialog.getExistingDirectory(
+            self, "Seleccionar Carpeta de Curso")
         if carpeta:
             nombre_curso = os.path.basename(carpeta)
+            if nombre_curso in self.cursos_data:
+                QMessageBox.warning(self, "Curso Existente", f"El curso '{
+                                    nombre_curso}' ya existe.")
+                return
+
             total_archivos = self.contar_archivos(carpeta)
             self.cursos_data[nombre_curso] = {
                 "id": nombre_curso,
@@ -1147,10 +1237,10 @@ class CursoTracker(QMainWindow):
                 "ruta": carpeta
             }
 
-            with open("cursos_data.json", "w", encoding="utf-8") as f:
-                json.dump(self.cursos_data, f, ensure_ascii=False, indent=2)
-
+            self.guardar_cursos_data()
             self.actualizar_grid_cursos()
+            QMessageBox.information(self, "Curso Agregado", f"El curso '{
+                                    nombre_curso}' ha sido agregado exitosamente.")
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
